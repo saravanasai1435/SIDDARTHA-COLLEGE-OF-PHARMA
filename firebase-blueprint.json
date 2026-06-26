@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "PortalState": {
+      "title": "PortalState",
+      "description": "The full synchronized state of the KVSR SCOPS Enterprise Portal",
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "object",
+          "description": "Institution config including semesters and time slots"
+        },
+        "timetable": {
+          "type": "array",
+          "description": "Array of timetable entries"
+        },
+        "staff": {
+          "type": "array",
+          "description": "Array of staff members"
+        },
+        "attendance": {
+          "type": "array",
+          "description": "Array of attendance records"
+        },
+        "leaves": {
+          "type": "array",
+          "description": "Array of leave requests"
+        },
+        "subjects": {
+          "type": "array",
+          "description": "Array of academic subjects"
+        },
+        "classes": {
+          "type": "array",
+          "description": "Array of classrooms"
+        },
+        "substitutions": {
+          "type": "array",
+          "description": "Array of substitution requests"
+        },
+        "settings": {
+          "type": "object",
+          "description": "Admin settings and Google Sheet synchronizer URL"
+        },
+        "logs": {
+          "type": "array",
+          "description": "System event audit trail logs"
+        }
+      },
+      "required": [
+        "config",
+        "timetable",
+        "staff",
+        "settings"
+      ]
+    }
+  },
+  "firestore": {
+    "/portalData/{stateId}": {
+      "schema": "PortalState",
+      "description": "Collection storing safe-keep points of the portal state"
+    }
+  }
+}

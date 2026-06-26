@@ -1,0 +1,10 @@
+{
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "name": "KVSR SCOPS Enterprise Portal",
+  "description": "Zero-AI Institutional Management Core",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

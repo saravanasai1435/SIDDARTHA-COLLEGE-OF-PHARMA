@@ -1,0 +1,2 @@
+The build files are in the /deploy folder.
+Download the project as ZIP and upload the contents of the /deploy folder to Netlify.

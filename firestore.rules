@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net Default-Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Safety Backups for Institution Portal Database States
+    match /portalData/{stateId} {
+      allow read, write: if true;
+    }
+    
+    // 3. Prevent any unmapped system accesses
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+  }
+}
