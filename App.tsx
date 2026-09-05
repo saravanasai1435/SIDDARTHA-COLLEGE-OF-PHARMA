@@ -7,6 +7,7 @@ import AdminDashboard from './components/Admin/AdminDashboard';
 import { getSession, setSession, getState, saveState } from './services/dataStore';
 import { fetchFromCloud, syncToCloud } from './services/googleSheetsService';
 import { fetchStateFromFirestore, saveStateToFirestore, testFirestoreConnection } from './services/firebaseService';
+import { formatTo12Hour } from './services/timeUtils';
 
 
 const App: React.FC = () => {
@@ -66,7 +67,27 @@ const App: React.FC = () => {
           }
 
           if (cloudData) {
-            // Cloud or Safety DB has data, use it
+            // Check if cloudData is outdated (e.g. contains Dr. Ramesh or lacks Dr. V. Karuna Sree / Dr. VK)
+            const hasOldStaff = cloudData.staff?.some((s: any) => s.name?.includes('Ramesh') || s.name?.includes('Sridevi'));
+            const missingPhotoStaff = !cloudData.staff?.some((s: any) => s.name?.includes('Karuna Sree') || s.code === 'Dr. VK');
+            
+            if (hasOldStaff || missingPhotoStaff) {
+              console.log("Cloud has outdated legacy data. Committing official 2026-27 photo timetable to cloud and local state...");
+              cloudData = currentState;
+              await saveStateToFirestore(currentState);
+              if (currentState.settings.googleSheetWebAppUrl) {
+                syncToCloud(currentState.settings.googleSheetWebAppUrl, currentState).catch(console.warn);
+              }
+            }
+
+            if (cloudData.config?.timeSlots) {
+              cloudData.config.timeSlots = cloudData.config.timeSlots.map((ts: any) => ({
+                ...ts,
+                start: formatTo12Hour(ts.start),
+                end: formatTo12Hour(ts.end)
+              }));
+            }
+
             saveState(cloudData);
             setAppState(cloudData);
             setCloudStatus('connected');

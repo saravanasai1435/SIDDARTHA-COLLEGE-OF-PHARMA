@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { getState, saveState, getRole } from '../../services/dataStore';
+import { getState, saveState, getRole, resetToFreshPhotoData } from '../../services/dataStore';
 import { AppState, StaffMember, Subject, ClassRoom, TimetableEntry, SystemLog, AttendanceRecord, LeaveRequest } from '../../types';
 import { detectConflicts } from '../../services/coreEngine';
 import { syncToCloud, fetchFromCloud } from '../../services/googleSheetsService';
 import { fetchStateFromFirestore } from '../../services/firebaseService';
+import { formatTo12Hour, formatSlotRange } from '../../services/timeUtils';
 
 
 const Label: React.FC<React.PropsWithChildren<{}>> = ({ children }) => (
@@ -45,6 +46,14 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       action
     };
     setState(prev => ({ ...prev, logs: [newLog, ...prev.logs].slice(0, 50) }));
+  };
+
+  const handleResetToPhotos = () => {
+    if (window.confirm("Are you sure you want to clear all staff, classes, and timetable entries, and rebuild fresh from the official 2026-27 timetable photos?")) {
+      const freshState = resetToFreshPhotoData();
+      setState(freshState);
+      addLog("Rebuilt database fresh from 2026-27 official timetable photos");
+    }
   };
 
   // --- CUSTOM DIALOG STATES FOR FULL WEBVIEW/ANDROID IMMERSION ---
@@ -262,8 +271,8 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
   const addTimeSlot = () => {
     setSlotLabel(`Period ${state.config.timeSlots.length + 1}`);
-    setSlotStart('16:00');
-    setSlotEnd('16:50');
+    setSlotStart('04:00 PM');
+    setSlotEnd('04:50 PM');
     setSlotIsBreak(false);
     setIsSlotModalOpen(true);
   };
@@ -276,15 +285,15 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const newSlot = { 
       id: 'ts-' + Date.now(), 
       label: slotLabel.trim(), 
-      start: slotStart.trim(), 
-      end: slotEnd.trim(), 
+      start: formatTo12Hour(slotStart.trim()), 
+      end: formatTo12Hour(slotEnd.trim()), 
       isBreak: slotIsBreak 
     };
     setState(prev => ({
       ...prev,
       config: { ...prev.config, timeSlots: [...prev.config.timeSlots, newSlot] }
     }));
-    addLog(`System: Added custom time slot [${slotLabel}]`);
+    addLog(`System: Added custom time slot [${slotLabel}] (${newSlot.start} - ${newSlot.end})`);
     setIsSlotModalOpen(false);
   };
 
@@ -455,14 +464,33 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                   <button key={m} onClick={() => setRegMode(m as any)} className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${regMode === m ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-emerald-600'}`}>{m}s</button>
                 ))}
               </div>
-              <button onClick={() => regMode === 'staff' ? addStaff() : regMode === 'subject' ? addSubject() : addClass()} className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-xl shadow-emerald-200">New {regMode} Record</button>
+              <div className="flex gap-3 flex-wrap">
+                <button 
+                  onClick={handleResetToPhotos}
+                  className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-amber-200 transition-all flex items-center gap-2 active:scale-95"
+                  title="Wipe database and re-seed 100% fresh from the two uploaded 2026-27 timetable photos"
+                >
+                  <i className="fa-solid fa-camera-rotate"></i>
+                  Reset from Photos
+                </button>
+                <button onClick={() => regMode === 'staff' ? addStaff() : regMode === 'subject' ? addSubject() : addClass()} className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-xl shadow-emerald-200">New {regMode} Record</button>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {(regMode === 'staff' ? state.staff : regMode === 'subject' ? state.subjects : state.classes).map((item: any) => (
                 <div key={item.id} className="p-6 bg-white border border-slate-100 rounded-[2rem] flex justify-between items-center shadow-sm hover:shadow-md transition-all">
                   <div>
-                    <p className="text-sm font-black text-emerald-900">{item.name}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.code || item.department || `Section ${item.section}`}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-black text-emerald-900">{item.name}</p>
+                      {item.code && (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-mono font-bold">
+                          {item.code}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                      {item.department || (item.section ? `Section ${item.section}` : '')}
+                    </p>
                   </div>
                   <button onClick={() => deleteItem(regMode, item.id)} className="w-10 h-10 rounded-xl flex items-center justify-center text-red-200 hover:text-red-500 hover:bg-red-50 transition-all"><i className="fa-solid fa-trash-can"></i></button>
                 </div>
@@ -489,20 +517,32 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
               </div>
             </div>
             {gridClassId ? (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {state.config.timeSlots.map(slot => {
-                  const entry = state.timetable.find(e => e.day === selectedDay && e.slotId === slot.id && e.classId === gridClassId);
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {state.config.timeSlots.filter(s => selectedDay === 'Saturday' ? s.id.startsWith('sat-') : !s.id.startsWith('sat-')).map(slot => {
+                  const slotEntries = state.timetable.filter(e => e.day === selectedDay && e.slotId === slot.id && e.classId === gridClassId);
                   if (slot.isBreak) return <div key={slot.id} className="p-6 bg-amber-50 rounded-[2rem] border border-amber-100 flex items-center justify-center text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">{slot.label}</div>;
                   return (
-                    <div key={slot.id} onClick={() => setEditingSlot(slot.id)} className={`p-8 rounded-[2.5rem] border transition-all cursor-pointer relative group ${entry ? 'bg-emerald-600 text-white shadow-xl scale-[1.02]' : 'bg-white border-slate-100 hover:border-emerald-200 shadow-sm'}`}>
-                      <p className="text-[8px] font-black uppercase mb-1 opacity-50 tracking-widest">{slot.label}</p>
-                      {entry ? (
-                        <>
-                          <p className="text-xs font-black leading-tight mb-1">{state.subjects.find(s => s.id === entry.subjectId)?.name}</p>
-                          <p className="text-[9px] font-bold opacity-80 uppercase tracking-tight">{state.staff.find(s => s.id === entry.facultyId)?.name}</p>
-                          <button onClick={(e) => { e.stopPropagation(); clearSlot(slot.id); }} className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"><i className="fa-solid fa-xmark"></i></button>
-                        </>
-                      ) : <p className="text-[9px] font-black text-slate-200">Available Slot</p>}
+                    <div key={slot.id} onClick={() => setEditingSlot(slot.id)} className={`p-6 rounded-[2.5rem] border transition-all cursor-pointer relative group ${slotEntries.length > 0 ? 'bg-emerald-600 text-white shadow-xl' : 'bg-white border-slate-100 hover:border-emerald-200 shadow-sm'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-[8px] font-black uppercase opacity-60 tracking-widest">{slot.label}</p>
+                        <span className="text-[9px] font-mono opacity-60">{formatSlotRange(slot.start, slot.end)}</span>
+                      </div>
+                      {slotEntries.length > 0 ? (
+                        <div className="space-y-2">
+                          {slotEntries.map((entry, idx) => (
+                            <div key={entry.id || idx} className="relative pr-6">
+                              {entry.batch && (
+                                <span className="inline-block px-1.5 py-0.5 mb-1 bg-emerald-700/80 rounded text-[8px] font-bold uppercase">
+                                  {entry.batch}
+                                </span>
+                              )}
+                              <p className="text-xs font-black leading-tight mb-0.5">{state.subjects.find(s => s.id === entry.subjectId)?.name}</p>
+                              <p className="text-[9px] font-bold opacity-80 uppercase tracking-tight">{state.staff.find(s => s.id === entry.facultyId)?.name}</p>
+                              <button onClick={(e) => { e.stopPropagation(); clearSlot(slot.id); }} className="absolute top-0 right-0 text-white/40 hover:text-white transition-colors"><i className="fa-solid fa-xmark"></i></button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="text-[9px] font-black text-slate-300 py-4 text-center">Available Slot</p>}
                       {editingSlot === slot.id && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-emerald-950/50 backdrop-blur-md p-4" onClick={e => {e.stopPropagation(); setEditingSlot(null);}}>
                           <div className="bg-white rounded-[3rem] p-10 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
@@ -694,24 +734,26 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
                     {/* Start Time */}
                     <div className="w-full md:w-1/5">
-                      <Label>Start Hour</Label>
+                      <Label>Start Time (12-hr)</Label>
                       <input 
                         type="text" 
                         value={slot.start} 
-                        placeholder="HH:MM"
+                        placeholder="e.g. 09:30 AM"
                         onChange={(e) => handleTimeSlotChange(slot.id, 'start', e.target.value)} 
+                        onBlur={(e) => handleTimeSlotChange(slot.id, 'start', formatTo12Hour(e.target.value))}
                         className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                       />
                     </div>
 
                     {/* End Time */}
                     <div className="w-full md:w-1/5">
-                      <Label>End Hour</Label>
+                      <Label>End Time (12-hr)</Label>
                       <input 
                         type="text" 
                         value={slot.end} 
-                        placeholder="HH:MM"
+                        placeholder="e.g. 10:20 AM"
                         onChange={(e) => handleTimeSlotChange(slot.id, 'end', e.target.value)} 
+                        onBlur={(e) => handleTimeSlotChange(slot.id, 'end', formatTo12Hour(e.target.value))}
                         className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                       />
                     </div>
@@ -771,22 +813,22 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Start Time</Label>
+                  <Label>Start Time (12-hr)</Label>
                   <input 
                     type="text" 
                     value={slotStart} 
                     onChange={e => setSlotStart(e.target.value)} 
-                    placeholder="HH:MM (24h)"
+                    placeholder="e.g. 04:00 PM"
                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   />
                 </div>
                 <div>
-                  <Label>End Time</Label>
+                  <Label>End Time (12-hr)</Label>
                   <input 
                     type="text" 
                     value={slotEnd} 
                     onChange={e => setSlotEnd(e.target.value)} 
-                    placeholder="HH:MM (24h)"
+                    placeholder="e.g. 04:50 PM"
                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   />
                 </div>

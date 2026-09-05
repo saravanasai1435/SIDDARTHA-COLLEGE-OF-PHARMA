@@ -24,11 +24,14 @@ export interface TimetableEntry {
   classId: string;
   type: 'Lecture' | 'Lab' | 'Seminar' | 'Clinical';
   isLocked?: boolean;
+  batch?: string;
+  roomOrLab?: string;
 }
 
 export interface StaffMember {
   id: string;
   name: string;
+  code?: string;
   email: string;
   department: string;
   specialization: string[];

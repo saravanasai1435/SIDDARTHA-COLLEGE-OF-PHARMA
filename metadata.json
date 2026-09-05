@@ -3,7 +3,7 @@
     "geolocation"
   ],
   "name": "KVSR SCOPS Enterprise Portal",
-  "description": "Zero-AI Institutional Management Core",
+  "description": "KVSR Siddhartha College of Pharmaceutical Sciences Academic Timetable Portal",
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
