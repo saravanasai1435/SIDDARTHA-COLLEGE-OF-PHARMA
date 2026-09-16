@@ -5,7 +5,7 @@ import { getFreshInitialState, FRESH_INSTITUTION_CONFIG } from './freshTimetable
 import { formatTo12Hour } from './timeUtils';
 
 const KEYS = {
-  STATE: 'kvsc_enterprise_state_2026_photos_v1',
+  STATE: 'kvsc_enterprise_state_2026_institutional_v2',
   AUTH: 'sc_auth_session',
   ROLE: 'sc_auth_role'
 };
@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
   principalUsername: '1234',
   principalPassword: '1234',
   cloudDbEnabled: true,
-  googleSheetWebAppUrl: 'https://script.google.com/macros/s/AKfycbx8_TxBONe9Lu_L9TLtz7-ouYFceGA8hfrcAKf1OBZtTDstftr3p_5ll1E3gQF2QjzR/exec'
+  googleSheetWebAppUrl: ''
 };
 
 export const INITIAL_STATE: AppState = getFreshInitialState(DEFAULT_SETTINGS);
@@ -47,10 +47,11 @@ export const getState = (): AppState => {
   }
   try {
     const parsed = JSON.parse(data);
-    // If old staff like Dr. Ramesh is present, or staff does not match the photos, refresh to fresh photo state
+    // If old staff like Dr. Ramesh is present, or staff does not match the photos, or missing institutional classes, refresh to fresh photo state
     const hasOldData = parsed.staff?.some((s: any) => s.name?.includes('Ramesh') || s.name?.includes('Sridevi'));
     const isMissingPhotoStaff = !parsed.staff?.some((s: any) => s.name?.includes('Karuna Sree') || s.code === 'Dr. VK');
-    if (hasOldData || isMissingPhotoStaff) {
+    const isMissingInstitutionalClasses = !parsed.classes || parsed.classes.length < 10;
+    if (hasOldData || isMissingPhotoStaff || isMissingInstitutionalClasses) {
       console.log("Stale timetable detected. Resetting to official 2026-27 photo timetable...");
       return resetToFreshPhotoData();
     }
@@ -58,7 +59,9 @@ export const getState = (): AppState => {
     // Ensure nested defaults exist
     if (!parsed.settings) parsed.settings = { ...DEFAULT_SETTINGS };
     if (parsed.settings.cloudDbEnabled === undefined) parsed.settings.cloudDbEnabled = true;
-    if (!parsed.settings.googleSheetWebAppUrl) parsed.settings.googleSheetWebAppUrl = DEFAULT_SETTINGS.googleSheetWebAppUrl;
+    if (parsed.settings.googleSheetWebAppUrl?.includes('AKfycbx8_TxBONe9Lu_L9TLtz7-ouYFceGA8hfrcAKf1OBZtTDstftr3p_5ll1E3gQF2QjzR')) {
+      parsed.settings.googleSheetWebAppUrl = '';
+    }
     if (!parsed.config) {
       parsed.config = FRESH_INSTITUTION_CONFIG;
     } else if (parsed.config.timeSlots) {

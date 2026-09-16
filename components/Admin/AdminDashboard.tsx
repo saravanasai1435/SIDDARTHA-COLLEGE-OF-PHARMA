@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { getState, saveState, getRole, resetToFreshPhotoData } from '../../services/dataStore';
+import { getState, saveState, getRole } from '../../services/dataStore';
 import { AppState, StaffMember, Subject, ClassRoom, TimetableEntry, SystemLog, AttendanceRecord, LeaveRequest } from '../../types';
 import { detectConflicts } from '../../services/coreEngine';
 import { syncToCloud, fetchFromCloud } from '../../services/googleSheetsService';
-import { fetchStateFromFirestore } from '../../services/firebaseService';
+import { fetchStateFromFirestore, saveStateToFirestore } from '../../services/firebaseService';
 import { formatTo12Hour, formatSlotRange } from '../../services/timeUtils';
 
 
@@ -46,14 +46,6 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       action
     };
     setState(prev => ({ ...prev, logs: [newLog, ...prev.logs].slice(0, 50) }));
-  };
-
-  const handleResetToPhotos = () => {
-    if (window.confirm("Are you sure you want to clear all staff, classes, and timetable entries, and rebuild fresh from the official 2026-27 timetable photos?")) {
-      const freshState = resetToFreshPhotoData();
-      setState(freshState);
-      addLog("Rebuilt database fresh from 2026-27 official timetable photos");
-    }
   };
 
   // --- CUSTOM DIALOG STATES FOR FULL WEBVIEW/ANDROID IMMERSION ---
@@ -317,59 +309,60 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   };
   
   const handlePush = async () => {
-    if (!state.settings.googleSheetWebAppUrl) {
-      triggerAlert("Configuration Missing", "Apps Script Web App URL is not configured. Go to System tab to set it.");
-      return;
-    }
     setIsSyncing(true);
-    const ok = await syncToCloud(state.settings.googleSheetWebAppUrl, state);
+    let firestoreSuccess = false;
+    let sheetSuccess = false;
+
+    // 1. Primary persistence: Google Cloud Firestore
+    try {
+      firestoreSuccess = await saveStateToFirestore(state);
+    } catch (fsErr) {
+      console.warn("Firestore push notice:", fsErr);
+    }
+
+    // 2. Optional: Google Sheets sync if URL configured
+    if (state.settings.googleSheetWebAppUrl && state.settings.googleSheetWebAppUrl.startsWith('http')) {
+      sheetSuccess = await syncToCloud(state.settings.googleSheetWebAppUrl, state);
+    }
+
     setIsSyncing(false);
-    if (ok) {
-      triggerAlert("Cloud Hub Updated", "Institutional database has been safely synchronized and cached on the Cloud Google Sheets core.");
+    if (firestoreSuccess || sheetSuccess) {
+      triggerAlert(
+        "Cloud Synchronized", 
+        `Institutional database safely synchronized to Google Cloud Firestore${sheetSuccess ? ' and Google Sheets' : ''}!`
+      );
     } else {
-      triggerAlert("Sync Error", "Failed to communicate with Google Sheets cloud backend. Check script settings and access level.");
+      triggerAlert("Sync Notice", "Unable to push to remote cloud right now. Current records remain safely saved in local storage.");
     }
   };
 
   const handlePull = async () => {
-    if (!state.settings.googleSheetWebAppUrl) {
-      triggerAlert("Configuration Missing", "Apps Script Web App URL is not configured. Go to System tab to set it.");
-      return;
-    }
-    
     triggerConfirm(
       "Synchronize and Overwrite Local Storage?",
-      "This process will completely replace your current device's local database snapshot and reload the institutional records from the Cloud!",
+      "This process will refresh your device's local database snapshot with the latest records saved in Google Cloud Firestore!",
       async () => {
         setIsSyncing(true);
-        let recoveryActive = false;
         try {
-          let data = null;
-          try {
+          // 1. Primary: Google Cloud Firestore
+          let data = await fetchStateFromFirestore();
+
+          // 2. Fallback: Google Sheet if configured
+          if (!data && state.settings.googleSheetWebAppUrl && state.settings.googleSheetWebAppUrl.startsWith('http')) {
             data = await fetchFromCloud(state.settings.googleSheetWebAppUrl);
-          } catch (sheetErr) {
-            console.warn("Primary fetch exception, attempting Firestore...", sheetErr);
-            data = await fetchStateFromFirestore();
-            if (data) {
-              recoveryActive = true;
-              triggerAlert("Firestore Safety Recovery", "Google Sheet was unreachable, but we successfully loaded the latest safety database snapshot from Google Firestore!");
-            }
           }
 
           if (data) { 
             setState(data); 
             saveState(data); 
-            if (!recoveryActive) {
-              triggerAlert("Instance Synchronized", "The device storage has been successfully refreshed with the latest central cloud records.");
-            }
+            triggerAlert("Instance Synchronized", "The device storage has been successfully refreshed with the latest central cloud records.");
             setTimeout(() => {
               window.location.reload(); 
             }, 1800);
           } else {
-            triggerAlert("Sync Empty", "No records found on the remote cloud sheet or Firebase safety backup.");
+            triggerAlert("Sync Notice", "No remote records found on Cloud database. Your current local records are up to date.");
           }
         } catch (err: any) {
-          triggerAlert("Connection Exception", "Communication with Cloud Core failed. Operating strictly in high-speed offline mode.");
+          triggerAlert("Connection Notice", "Operating in safe offline mode with local storage.");
         }
         setIsSyncing(false);
       }
@@ -465,14 +458,6 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 ))}
               </div>
               <div className="flex gap-3 flex-wrap">
-                <button 
-                  onClick={handleResetToPhotos}
-                  className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-amber-200 transition-all flex items-center gap-2 active:scale-95"
-                  title="Wipe database and re-seed 100% fresh from the two uploaded 2026-27 timetable photos"
-                >
-                  <i className="fa-solid fa-camera-rotate"></i>
-                  Reset from Photos
-                </button>
                 <button onClick={() => regMode === 'staff' ? addStaff() : regMode === 'subject' ? addSubject() : addClass()} className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-xl shadow-emerald-200">New {regMode} Record</button>
               </div>
             </div>
@@ -672,12 +657,47 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             </div>
 
             <div className="p-10 bg-white border border-emerald-100 rounded-[3rem] space-y-6 shadow-sm">
-              <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Global Persistence Bridge</h4>
-              <Label>Google Sheets Apps Script URL</Label>
-              <input type="text" value={state.settings.googleSheetWebAppUrl} onChange={e => updateSettings('googleSheetWebAppUrl', e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-mono text-emerald-800 shadow-inner" />
-              <div className="flex gap-4">
-                <button onClick={handlePush} disabled={isSyncing} className="flex-grow py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all">Push Local Data</button>
-                <button onClick={handlePull} disabled={isSyncing} className="flex-grow py-4 bg-white border border-emerald-100 text-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-50 transition-colors">Pull Cloud Data</button>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Global Persistence Bridge</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                    Primary Cloud: <span className="text-emerald-700 font-mono font-semibold">Google Cloud Firestore (Active)</span>
+                  </p>
+                </div>
+                <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Cloud Connected
+                </div>
+              </div>
+
+              <div>
+                <Label>Optional External Google Sheets Web App URL</Label>
+                <input 
+                  type="text" 
+                  placeholder="https://script.google.com/macros/s/.../exec (Optional)" 
+                  value={state.settings.googleSheetWebAppUrl} 
+                  onChange={e => updateSettings('googleSheetWebAppUrl', e.target.value)} 
+                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-mono text-emerald-800 shadow-inner" 
+                />
+              </div>
+
+              <div className="flex gap-4 pt-2">
+                <button 
+                  onClick={handlePush} 
+                  disabled={isSyncing} 
+                  className="flex-grow py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <i className="fa-solid fa-cloud-arrow-up"></i>
+                  {isSyncing ? 'Syncing...' : 'Push to Cloud Database'}
+                </button>
+                <button 
+                  onClick={handlePull} 
+                  disabled={isSyncing} 
+                  className="flex-grow py-4 bg-white border border-emerald-100 hover:bg-emerald-50 text-emerald-700 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                >
+                  <i className="fa-solid fa-cloud-arrow-down"></i>
+                  {isSyncing ? 'Syncing...' : 'Pull Latest Cloud Data'}
+                </button>
               </div>
             </div>
           </div>

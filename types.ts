@@ -69,6 +69,12 @@ export interface ClassRoom {
   id: string;
   name: string;
   section: string;
+  program?: 'B. Pharm' | 'Pharm. D';
+  year?: string;
+  semester?: string;
+  effectiveDate?: string;
+  incharge?: string;
+  roomNo?: string;
 }
 
 export interface Substitution {

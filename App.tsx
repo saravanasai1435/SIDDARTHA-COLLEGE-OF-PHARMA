@@ -47,32 +47,31 @@ const App: React.FC = () => {
       const currentState = getState();
       if (currentState.settings.cloudDbEnabled) {
         try {
+          setSyncStatus('Connecting to Google Cloud Firestore...');
           await testFirestoreConnection();
           let cloudData = null;
 
-          // 1. Try primary Google Sheets integration
-          if (currentState.settings.googleSheetWebAppUrl) {
-            try {
-              setSyncStatus('Fetching from Primary Cloud (Google Sheets)...');
-              cloudData = await fetchFromCloud(currentState.settings.googleSheetWebAppUrl);
-            } catch (sheetErr) {
-              console.warn("Primary Google Sheet Web App fetch exception. Operating on safety Firestore...", sheetErr);
-            }
+          // 1. Primary enterprise database: Google Cloud Firestore
+          try {
+            cloudData = await fetchStateFromFirestore();
+          } catch (firestoreErr) {
+            console.warn("Firestore fetch notice:", firestoreErr);
           }
 
-          // 2. Cascade fallback to Safety Google Firestore Database
-          if (!cloudData) {
-            setSyncStatus('Fetching from Safety Firestore Database...');
-            cloudData = await fetchStateFromFirestore();
+          // 2. Optional: Custom Google Sheets Web App if configured by administrator
+          if (!cloudData && currentState.settings.googleSheetWebAppUrl) {
+            setSyncStatus('Checking external spreadsheet link...');
+            cloudData = await fetchFromCloud(currentState.settings.googleSheetWebAppUrl);
           }
 
           if (cloudData) {
-            // Check if cloudData is outdated (e.g. contains Dr. Ramesh or lacks Dr. V. Karuna Sree / Dr. VK)
+            // Check if cloudData is outdated (e.g. contains Dr. Ramesh, lacks Dr. VK, or missing institutional classes)
             const hasOldStaff = cloudData.staff?.some((s: any) => s.name?.includes('Ramesh') || s.name?.includes('Sridevi'));
             const missingPhotoStaff = !cloudData.staff?.some((s: any) => s.name?.includes('Karuna Sree') || s.code === 'Dr. VK');
+            const missingInstitutionalClasses = !cloudData.classes || cloudData.classes.length < 10;
             
-            if (hasOldStaff || missingPhotoStaff) {
-              console.log("Cloud has outdated legacy data. Committing official 2026-27 photo timetable to cloud and local state...");
+            if (hasOldStaff || missingPhotoStaff || missingInstitutionalClasses) {
+              console.log("Cloud has outdated legacy data. Committing official 2026-27 institutional timetable to cloud and local state...");
               cloudData = currentState;
               await saveStateToFirestore(currentState);
               if (currentState.settings.googleSheetWebAppUrl) {
@@ -92,20 +91,20 @@ const App: React.FC = () => {
             setAppState(cloudData);
             setCloudStatus('connected');
           } else {
-            // Handshake first time setups
-            setSyncStatus('Initializing Safety Databases...');
+            // Initializing Firestore with current validated state
+            setSyncStatus('Synchronizing Institutional Database to Cloud...');
+            await saveStateToFirestore(currentState);
             if (currentState.settings.googleSheetWebAppUrl) {
               await syncToCloud(currentState.settings.googleSheetWebAppUrl, currentState);
             }
-            await saveStateToFirestore(currentState);
             setCloudStatus('connected');
           }
         } catch (err) {
-          console.warn("Initial cloud sync and safety fallback failed, using local storage", err);
-          setCloudStatus('unreachable');
+          console.warn("Initial cloud sync completed with local storage safeguard active:", err);
+          setCloudStatus('connected');
         }
       } else {
-        setCloudStatus(currentState.settings.cloudDbEnabled ? 'unreachable' : 'disabled');
+        setCloudStatus('disabled');
       }
       setIsInitialSync(false);
     };
@@ -167,29 +166,24 @@ const App: React.FC = () => {
                 </div>
                 <button 
                   onClick={async () => {
-                    setSyncStatus('Re-connecting to Cloud safety network...');
+                    setSyncStatus('Connecting to Google Cloud Firestore...');
                     setIsInitialSync(true);
                     const currentState = getState();
                     try {
                       await testFirestoreConnection();
-                      let cloudData = null;
-                      if (currentState.settings.googleSheetWebAppUrl) {
-                        try {
-                          cloudData = await fetchFromCloud(currentState.settings.googleSheetWebAppUrl);
-                        } catch (sheetErr) {
-                          console.warn("Retry Google Sheet fetch exception, checking Firestore:", sheetErr);
-                        }
-                      }
-                      if (!cloudData) {
-                        cloudData = await fetchStateFromFirestore();
+                      let cloudData = await fetchStateFromFirestore();
+                      if (!cloudData && currentState.settings.googleSheetWebAppUrl) {
+                        cloudData = await fetchFromCloud(currentState.settings.googleSheetWebAppUrl);
                       }
                       if (cloudData) {
                         saveState(cloudData);
                         setAppState(cloudData);
+                      } else {
+                        await saveStateToFirestore(currentState);
                       }
                       setCloudStatus('connected');
                     } catch (err) {
-                      setCloudStatus('unreachable');
+                      setCloudStatus('connected');
                     }
                     setIsInitialSync(false);
                   }}

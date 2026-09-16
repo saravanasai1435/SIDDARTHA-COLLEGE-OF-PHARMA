@@ -2,16 +2,18 @@
 import { AppState } from "../types";
 
 /**
- * Optimized REST logic for Google Sheets integration.
+ * Optimized REST logic for optional Google Sheets integration.
  * Uses 'text/plain' to avoid CORS preflight (OPTIONS) which Google Apps Script doesn't support.
  */
 export const syncToCloud = async (url: string, state: AppState): Promise<boolean> => {
-  if (!url) return false;
+  if (!url || typeof url !== 'string' || !url.trim().startsWith('http')) return false;
+  // Ignore placeholder or known inactive demo script URL
+  if (url.includes('AKfycbx8_TxBONe9Lu_L9TLtz7-ouYFceGA8hfrcAKf1OBZtTDstftr3p_5ll1E3gQF2QjzR')) {
+    return false;
+  }
+
   try {
-    // We send as text/plain to avoid CORS preflight issues
-    // Note: no-cors means we can't see the response body or status, 
-    // but the request will still reach the server.
-    await fetch(url, {
+    await fetch(url.trim(), {
       method: 'POST',
       mode: 'no-cors',
       headers: { 
@@ -21,27 +23,32 @@ export const syncToCloud = async (url: string, state: AppState): Promise<boolean
     });
     return true; 
   } catch (error) {
-    console.error("Cloud Sync POST Failed:", error);
+    console.warn("Optional Google Sheets sync skipped:", error);
     return false;
   }
 };
 
 /**
- * Fetches the application state from the Google Sheet Web App.
- * Handles redirects and basic validation.
+ * Fetches the application state from the optional Google Sheet Web App.
+ * Handles redirects and basic validation, returning null gracefully if unreachable.
  */
 export const fetchFromCloud = async (url: string): Promise<AppState | null> => {
-  if (!url) return null;
+  if (!url || typeof url !== 'string' || !url.trim().startsWith('http')) return null;
+  // Ignore placeholder or known inactive demo script URL
+  if (url.includes('AKfycbx8_TxBONe9Lu_L9TLtz7-ouYFceGA8hfrcAKf1OBZtTDstftr3p_5ll1E3gQF2QjzR')) {
+    return null;
+  }
+
   try {
-    const response = await fetch(url, { 
+    const response = await fetch(url.trim(), { 
       method: 'GET',
       cache: 'no-store',
-      redirect: 'follow' // Explicitly follow GAS redirects
+      redirect: 'follow'
     });
 
     if (!response.ok) {
-      console.warn(`Cloud Fetch Status: ${response.status} ${response.statusText}`);
-      throw new Error(`Server returned status ${response.status}: ${response.statusText}`);
+      console.warn(`Optional Google Sheets endpoint status: ${response.status} ${response.statusText}`);
+      return null;
     }
 
     const rawData = await response.json();
@@ -52,21 +59,22 @@ export const fetchFromCloud = async (url: string): Promise<AppState | null> => {
       try {
         data = JSON.parse(rawData);
       } catch (e) {
-        console.error("Cloud data was string but not valid JSON:", rawData);
-        throw new Error("Invalid format received from cloud server (not JSON).");
+        console.warn("Google Sheet response was not valid JSON format");
+        return null;
       }
     }
 
-    // Relaxed Validation: If it has 'config' and 'settings', it's likely a valid AppState
+    // Validation: If it has 'config' and 'settings' or 'timetable', it's valid
     if (data && typeof data === 'object' && (data.config || data.settings || data.timetable)) {
-      console.log("Cloud Data Validated successfully.");
+      console.log("Google Sheets state validated successfully.");
       return data as AppState;
     }
     
-    console.warn("Cloud Data failed validation check:", data);
+    console.warn("Google Sheet data missing required state properties");
     return null;
   } catch (error) {
-    console.error("Cloud Fetch (GET) Exception:", error);
-    throw error; // Let the exception propagate to trigger fallback properly in the caller!
+    console.warn("Optional Google Sheets fetch not available; operating on Firestore:", error);
+    return null;
   }
 };
+
