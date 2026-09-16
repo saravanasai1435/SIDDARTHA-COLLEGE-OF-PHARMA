@@ -198,44 +198,50 @@ const TimetableBoard: React.FC = () => {
             </button>
           </div>
 
-          {/* Day Selector */}
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl overflow-x-auto max-w-full shadow-inner">
-            {appState.config.workingDays.map(day => (
-              <button 
-                key={day}
-                onClick={() => setSelectedDay(day)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                  selectedDay === day 
-                    ? 'bg-emerald-600 text-white shadow-md' 
-                    : 'text-slate-500 hover:text-emerald-800'
-                }`}
-              >
-                {day.substring(0, 3)}
-              </button>
-            ))}
+          {/* Right Controls: Three Program Buttons on Top of Day Selector */}
+          <div className="flex flex-col items-center lg:items-end gap-2.5">
+            {/* Three Program Filter Buttons */}
+            <div className="flex bg-slate-100 p-1 rounded-2xl shadow-inner gap-1">
+              {(['ALL', 'B. Pharm', 'Pharm. D'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setProgramFilter(p);
+                    if (viewMode !== 'class') setViewMode('class');
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+                    programFilter === p && viewMode === 'class'
+                      ? 'bg-emerald-950 text-white shadow-md'
+                      : 'text-slate-600 hover:text-emerald-800 hover:bg-white/50'
+                  }`}
+                >
+                  {p === 'ALL' ? 'All Programs' : p}
+                </button>
+              ))}
+            </div>
+
+            {/* Day Selector */}
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl overflow-x-auto max-w-full shadow-inner">
+              {appState.config.workingDays.map(day => (
+                <button 
+                  key={day}
+                  onClick={() => setSelectedDay(day)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+                    selectedDay === day 
+                      ? 'bg-emerald-600 text-white shadow-md' 
+                      : 'text-slate-500 hover:text-emerald-800'
+                  }`}
+                >
+                  {day.substring(0, 3)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Dynamic Selector Bar */}
         {viewMode === 'class' ? (
           <div className="mb-10 space-y-4">
-            {/* Program Filter Pills */}
-            <div className="flex justify-center gap-2 flex-wrap">
-              {(['ALL', 'B. Pharm', 'Pharm. D'] as const).map(p => (
-                <button
-                  key={p}
-                  onClick={() => setProgramFilter(p)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                    programFilter === p
-                      ? 'bg-emerald-950 text-white shadow-md'
-                      : 'bg-slate-100 text-slate-600 hover:bg-emerald-100/60'
-                  }`}
-                >
-                  {p === 'ALL' ? 'All Programs (12 Classes)' : p}
-                </button>
-              ))}
-            </div>
-
             {/* Class Cards Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
               {displayedClasses.map(c => {

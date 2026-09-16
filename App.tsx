@@ -17,24 +17,6 @@ const App: React.FC = () => {
   const [isInitialSync, setIsInitialSync] = useState(true);
   const [syncStatus, setSyncStatus] = useState('Synchronizing Core Database...');
   const [cloudStatus, setCloudStatus] = useState<'connected' | 'unreachable' | 'disabled'>('disabled');
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
-
-  // Monitor installation signals for Android / Chrome mobile
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      // Prevent browser automated installation banner
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallPrompt(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
 
   // Initial Data Pull or Push to Cloud
   useEffect(() => {
@@ -240,71 +222,6 @@ const App: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Android App & Group Distribution Hub */}
-          <section className="max-w-7xl mx-auto px-4 mt-4 mb-8 animate-in fade-in duration-700">
-            <div className="bg-gradient-to-br from-[#0c4a6e] to-[#0369a1] rounded-[2.5rem] p-6 md:p-10 text-white shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-6 relative overflow-hidden">
-              <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-sky-500/20 rounded-full blur-3xl"></div>
-              <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-5">
-                <div className="w-16 h-16 rounded-3xl bg-sky-400/20 flex items-center justify-center text-sky-200 border border-sky-400/30 text-3xl shrink-0 shadow-lg">
-                  <i className="fa-brands fa-android"></i>
-                </div>
-                <div>
-                  <h3 className="text-lg font-black tracking-tight uppercase text-white">KVSR SCOPS Android App Assistant</h3>
-                  <p className="text-[9px] uppercase tracking-widest font-bold text-sky-200 mt-1">Install on Android or instant-share with your faculty cohort</p>
-                  <p className="text-xs text-sky-100/90 mt-2 max-w-2xl font-medium leading-relaxed">
-                    Access real-time schedules, academic registries, and automated substitutions with mobile-first speed. In <span className="font-bold text-sky-200">Google Chrome on Android</span>, tap the install button below to save it as a native standalone app on your phone with zero delay!
-                  </p>
-                </div>
-              </div>
-              
-              <div className="relative z-10 flex flex-wrap gap-3.5 shrink-0 w-full lg:w-auto justify-start lg:justify-end">
-                {showInstallPrompt && (
-                  <button 
-                    onClick={async () => {
-                      if (deferredPrompt) {
-                        try {
-                          deferredPrompt.prompt();
-                          const { outcome } = await deferredPrompt.userChoice;
-                          console.log(`PWA install prompt result: ${outcome}`);
-                        } catch (e) {
-                          console.warn("Prompt trigger error:", e);
-                        }
-                        setDeferredPrompt(null);
-                        setShowInstallPrompt(false);
-                      }
-                    }}
-                    className="px-6 py-3.5 bg-sky-500 hover:bg-sky-400 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2.5 shadow-lg shadow-sky-900/30 shrink-0 cursor-pointer"
-                  >
-                    <i className="fa-solid fa-download"></i>
-                    Install App on Phone
-                  </button>
-                )}
-                <button 
-                  onClick={() => {
-                    const shareText = `Hey team! 🏫 Here is the live, installable Android-ready portal for KVSR SCOPS Academic Portal (Timetables, substitutes tracker, and logs synced with Google Sheets/Firestore). Open it in Google Chrome on your phone, and tap install to use it like a native app!\n\n🌐 Open and Install: ${window.location.href}`;
-                    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-                    window.open(whatsappUrl, '_blank');
-                  }}
-                  className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2.5 shadow-lg shadow-emerald-950/30 shrink-0 cursor-pointer"
-                >
-                  <i className="fa-brands fa-whatsapp"></i>
-                  Share to WhatsApp Group
-                </button>
-                <button 
-                  onClick={() => {
-                    const shareText = `Hey team! 🏫 Here is our live, installable Android portal for KVSR SCOPS:\n\n${window.location.href}`;
-                    navigator.clipboard.writeText(shareText);
-                    alert("📋 Standard invite has been copied to your clipboard! Paste it into your faculty or peer group chat.");
-                  }}
-                  className="px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2.5 border border-slate-700 shadow-md shrink-0 cursor-pointer"
-                >
-                  <i className="fa-solid fa-copy"></i>
-                  Copy Invite Link
-                </button>
               </div>
             </div>
           </section>
