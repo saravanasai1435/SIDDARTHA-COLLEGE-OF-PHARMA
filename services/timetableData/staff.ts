@@ -2,6 +2,17 @@ import { StaffMember } from '../../types';
 
 export const ALL_STAFF: StaffMember[] = [
   {
+    id: 'staff-as',
+    name: 'Dr. A. Suneetha',
+    code: 'Dr. AS',
+    email: 'principal@kvsrsiddharthapharma.edu.in',
+    department: 'Pharmaceutical Analysis (Principal)',
+    specialization: ['Pharmaceutical Analysis', 'Quality Assurance', 'Institutional Governance'],
+    assignedSubjects: [],
+    isActive: true,
+    availability: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  },
+  {
     id: 'staff-vk',
     name: 'Dr. V. Karuna Sree',
     code: 'Dr. VK',

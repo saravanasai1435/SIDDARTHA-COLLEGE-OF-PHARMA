@@ -4,12 +4,14 @@ import { ALL_STAFF } from './timetableData/staff';
 import { ALL_SUBJECTS } from './timetableData/subjects';
 import { BPHARM_ENTRIES } from './timetableData/bpharmEntries';
 import { PHARMD_ENTRIES } from './timetableData/pharmdEntries';
+import { generateDefaultStudents, generateSampleSessionsAndAttendance } from './attendanceService';
 
 export const FRESH_INSTITUTION_CONFIG: InstitutionConfig = {
   workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   periodsPerDay: 9,
   academicYear: '2026-27',
   term: 'Academic Year 2026-27 (KVSRSCOPS/ACD/TT)',
+  attendanceCutoffPercent: 80,
   timeSlots: [
     // Weekday Slots (Mon - Fri)
     { id: 'slot-1', label: 'Period 1', start: '09:30 AM', end: '10:20 AM', isBreak: false },
@@ -47,12 +49,22 @@ export const getFreshInitialState = (customSettings?: Partial<AdminSettings>): A
     attendance: [],
     leaves: [],
     substitutions: [],
+    students: [],
+    sessions: [],
+    studentAttendance: [],
+    rosterWipedV1: true,
     logs: [
       {
         id: 'log-seed-1',
         timestamp: '2026-09-03 09:00:00',
         user: 'system',
         action: 'Official 2026-27 Master Timetables synchronized for B. Pharm (I, II, III, IV) and Pharm. D (I, II, III, IV, V)'
+      },
+      {
+        id: 'log-seed-2',
+        timestamp: new Date().toLocaleTimeString(),
+        user: 'system',
+        action: 'Student directory initialized with empty roster (ready for manual student enrollment or Excel/CSV import)'
       }
     ],
     settings: {
@@ -65,7 +77,7 @@ export const getFreshInitialState = (customSettings?: Partial<AdminSettings>): A
       principalUsername: '1234',
       principalPassword: '1234',
       cloudDbEnabled: true,
-      googleSheetWebAppUrl: 'https://script.google.com/macros/s/AKfycbx8_TxBONe9Lu_L9TLtz7-ouYFceGA8hfrcAKf1OBZtTDstftr3p_5ll1E3gQF2QjzR/exec',
+      googleSheetWebAppUrl: '',
       ...customSettings
     }
   };

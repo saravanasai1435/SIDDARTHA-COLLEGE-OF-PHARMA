@@ -6,6 +6,7 @@ import { detectConflicts } from '../../services/coreEngine';
 import { syncToCloud, fetchFromCloud } from '../../services/googleSheetsService';
 import { fetchStateFromFirestore, saveStateToFirestore } from '../../services/firebaseService';
 import { formatTo12Hour, formatSlotRange } from '../../services/timeUtils';
+import { AttendanceManager } from './Attendance/AttendanceManager';
 
 
 const Label: React.FC<React.PropsWithChildren<{}>> = ({ children }) => (
@@ -186,16 +187,6 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     );
   };
 
-  // --- ATTENDANCE ---
-  const markAttendance = (staffId: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    const exists = state.attendance.some(a => a.staffId === staffId && a.date === today);
-    if (exists) return;
-    const record: AttendanceRecord = { id: Date.now().toString(), staffId, date: today, timestamp: new Date().toLocaleTimeString(), status: 'Present' };
-    setState(prev => ({ ...prev, attendance: [...prev.attendance, record] }));
-    addLog(`Attendance: Checked-in ${state.staff.find(s => s.id === staffId)?.name}`);
-  };
-
   // --- LEAVES ---
   const handleLeaveApply = (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,7 +199,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     addLog(`Leaves: New application for ${state.staff.find(s => s.id === leaveStaffId)?.name}`);
     setLeaveReason(''); 
     setLeaveStaffId(''); 
-    triggerAlert("Submitted", "Leave request has been submitted for principal approval.");
+    triggerAlert("Submitted", "Leave request has been submitted for approval by Principal Dr. A. Suneetha.");
   };
 
   // --- TIMETABLE ---
@@ -380,29 +371,41 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 items-start">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 items-start">
       {/* LEFT SIDEBAR MENU */}
       <aside className="lg:w-72 w-full shrink-0 lg:sticky lg:top-24">
-        <div className="p-8 glass rounded-[2.5rem] border-emerald-100 shadow-xl text-center mb-6">
-          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-emerald-200">
-            <i className={`fa-solid ${userRole === 'principal' ? 'fa-crown' : 'fa-user-shield'} text-2xl`}></i>
+        <div className="p-4 sm:p-6 lg:p-8 glass rounded-2xl sm:rounded-[2.5rem] border-emerald-100 shadow-lg sm:shadow-xl text-center mb-3 sm:mb-6 flex lg:flex-col items-center justify-between lg:justify-center gap-3">
+          <div className="flex items-center lg:flex-col gap-3 lg:gap-0">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-16 lg:h-16 bg-emerald-600 rounded-xl lg:rounded-2xl flex items-center justify-center text-white lg:mx-auto lg:mb-4 shadow-md lg:shadow-lg shadow-emerald-200 shrink-0">
+              <i className={`fa-solid ${userRole === 'principal' ? 'fa-crown' : 'fa-user-shield'} text-lg sm:text-xl lg:text-2xl`}></i>
+            </div>
+            <div className="text-left lg:text-center">
+              <h2 className="text-xs lg:text-sm font-black text-emerald-900 uppercase tracking-tighter">
+                {userRole === 'principal' ? 'Dr. A. Suneetha' : `${userRole} access`}
+              </h2>
+              <p className="text-[8px] sm:text-[9px] font-bold text-emerald-500 uppercase tracking-[0.2em] mt-0.5 lg:mt-1">
+                {userRole === 'principal' ? 'College Principal' : 'Institutional Core'}
+              </p>
+            </div>
           </div>
-          <h2 className="text-sm font-black text-emerald-900 uppercase tracking-tighter">{userRole} access</h2>
-          <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-[0.2em] mt-1">Institutional Core</p>
+          <button onClick={onLogout} className="lg:hidden px-3 py-1.5 rounded-xl text-[10px] font-bold text-red-500 hover:bg-red-50 transition-all border border-red-100 flex items-center gap-1.5 shrink-0">
+            <i className="fa-solid fa-power-off text-xs"></i>
+            <span>Logout</span>
+          </button>
         </div>
         
-        <nav className="space-y-2">
+        <nav className="flex lg:flex-col overflow-x-auto lg:overflow-visible gap-1.5 sm:gap-2 pb-2 lg:pb-0">
           {menuItems.filter(item => userRole === 'principal' || !item.principalOnly).map(item => (
             <button 
               key={item.id} 
               onClick={() => setActiveTab(item.id as any)} 
-              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all ${activeTab === item.id ? 'bg-emerald-600 text-white shadow-xl translate-x-1' : 'text-emerald-800 hover:bg-emerald-100/50'}`}
+              className={`shrink-0 lg:w-full flex items-center gap-2 sm:gap-3 lg:gap-4 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 lg:py-4 rounded-xl sm:rounded-2xl font-bold transition-all text-left ${activeTab === item.id ? 'bg-emerald-600 text-white shadow-md lg:shadow-xl lg:translate-x-1' : 'text-emerald-800 bg-white/70 lg:bg-transparent hover:bg-emerald-100/50'}`}
             >
-              <i className={`fa-solid ${item.icon} w-6 text-lg`}></i>
-              <span className="text-[10px] uppercase tracking-widest">{item.label}</span>
+              <i className={`fa-solid ${item.icon} text-xs sm:text-sm lg:text-lg`}></i>
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider sm:tracking-widest whitespace-nowrap">{item.label}</span>
             </button>
           ))}
-          <div className="pt-8">
+          <div className="hidden lg:block pt-8">
             <button onClick={onLogout} className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold text-red-500 hover:bg-red-50 transition-all border border-transparent hover:border-red-100">
               <i className="fa-solid fa-power-off w-6 text-lg"></i>
               <span className="text-[10px] uppercase tracking-widest">Logout System</span>
@@ -412,35 +415,34 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       </aside>
 
       {/* RIGHT CONTENT WINDOW */}
-      <main className="flex-grow glass rounded-[3rem] p-10 min-h-[850px] border-emerald-100 shadow-2xl relative overflow-hidden flex flex-col w-full">
+      <main className="flex-grow glass rounded-2xl sm:rounded-[3rem] p-4 sm:p-6 md:p-10 min-h-0 lg:min-h-[850px] border-emerald-100 shadow-xl sm:shadow-2xl relative overflow-hidden flex flex-col w-full">
         
         {/* TAB: MONITOR */}
         {activeTab === 'monitor' && (
-          <div className="space-y-10 animate-in fade-in fill-mode-both">
-            <h3 className="text-3xl font-black text-emerald-900 uppercase tracking-tighter">System Monitor</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-6 sm:space-y-10 animate-in fade-in fill-mode-both">
+            <h3 className="text-xl sm:text-3xl font-black text-emerald-900 uppercase tracking-tighter">System Monitor</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               {[
-                { l: 'Faculty Registry', v: state.staff.length, i: 'fa-users', c: 'emerald' },
-                { l: 'Class Matrix', v: state.classes.length, i: 'fa-door-open', c: 'blue' },
-                { l: 'Auth Pending', v: state.leaves.filter(l => l.status === 'Pending').length, i: 'fa-clock', c: 'amber' }
+                { l: 'Faculty Registry', v: state.staff.length, i: 'fa-users', bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-900', iconColor: 'text-emerald-200' },
+                { l: 'Class Matrix', v: state.classes.length, i: 'fa-door-open', bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-900', iconColor: 'text-blue-200' }
               ].map((s, i) => (
-                <div key={i} className={`p-8 bg-${s.c}-50 rounded-3xl border border-${s.c}-100 shadow-sm transition-all hover:scale-[1.02]`}>
+                <div key={i} className={`p-5 sm:p-8 ${s.bg} rounded-2xl sm:rounded-3xl border ${s.border} shadow-sm transition-all hover:scale-[1.01]`}>
                   <Label>{s.l}</Label>
                   <div className="flex items-center justify-between">
-                    <p className={`text-4xl font-black text-${s.c}-900`}>{s.v}</p>
-                    <i className={`fa-solid ${s.i} text-${s.c}-200 text-3xl`}></i>
+                    <p className={`text-2xl sm:text-4xl font-black ${s.text}`}>{s.v}</p>
+                    <i className={`fa-solid ${s.i} ${s.iconColor} text-2xl sm:text-3xl`}></i>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="space-y-4 flex-grow">
+            <div className="space-y-3 sm:space-y-4 flex-grow">
               <Label>Real-time Audit Stream</Label>
-              <div className="bg-slate-50 rounded-[2.5rem] p-8 h-80 overflow-y-auto border border-slate-100 custom-scrollbar text-[11px] font-bold">
+              <div className="bg-slate-50 rounded-2xl sm:rounded-[2.5rem] p-4 sm:p-8 h-64 sm:h-80 overflow-y-auto border border-slate-100 custom-scrollbar text-[10px] sm:text-[11px] font-bold">
                 {state.logs.map(log => (
-                  <div key={log.id} className="flex justify-between items-center py-4 border-b border-slate-200 last:border-0">
-                    <span className="text-slate-400 font-mono">{log.timestamp}</span>
-                    <span className="text-emerald-900">{log.action}</span>
-                    <span className="text-emerald-600 uppercase bg-emerald-100/50 px-2 py-0.5 rounded-md">{log.user}</span>
+                  <div key={log.id} className="flex justify-between items-center py-2.5 sm:py-4 border-b border-slate-200 last:border-0 gap-2">
+                    <span className="text-slate-400 font-mono text-[9px] sm:text-xs shrink-0">{log.timestamp}</span>
+                    <span className="text-emerald-900 truncate flex-1">{log.action}</span>
+                    <span className="text-emerald-600 uppercase bg-emerald-100/50 px-2 py-0.5 rounded-md text-[8px] sm:text-[9px] shrink-0">{log.user}</span>
                   </div>
                 ))}
               </div>
@@ -450,34 +452,34 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
         {/* REGISTRY */}
         {activeTab === 'registry' && (
-          <div className="space-y-8 animate-in fade-in fill-mode-both">
-            <div className="flex justify-between items-center flex-wrap gap-4">
-              <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+          <div className="space-y-6 sm:space-y-8 animate-in fade-in fill-mode-both">
+            <div className="flex justify-between items-center flex-wrap gap-3 sm:gap-4">
+              <div className="flex bg-slate-100 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl">
                 {['staff', 'subject', 'class'].map(m => (
-                  <button key={m} onClick={() => setRegMode(m as any)} className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${regMode === m ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-emerald-600'}`}>{m}s</button>
+                  <button key={m} onClick={() => setRegMode(m as any)} className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[8px] sm:text-[9px] font-black uppercase tracking-wider sm:tracking-widest transition-all ${regMode === m ? 'bg-emerald-600 text-white shadow-md sm:shadow-lg' : 'text-slate-500 hover:text-emerald-600'}`}>{m}s</button>
                 ))}
               </div>
-              <div className="flex gap-3 flex-wrap">
-                <button onClick={() => regMode === 'staff' ? addStaff() : regMode === 'subject' ? addSubject() : addClass()} className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-xl shadow-emerald-200">New {regMode} Record</button>
+              <div className="flex gap-2 sm:gap-3 flex-wrap">
+                <button onClick={() => regMode === 'staff' ? addStaff() : regMode === 'subject' ? addSubject() : addClass()} className="px-4 sm:px-6 py-2.5 sm:py-3 bg-emerald-600 text-white rounded-xl sm:rounded-2xl text-[8px] sm:text-[9px] font-black uppercase tracking-wider sm:tracking-widest shadow-lg sm:shadow-xl shadow-emerald-200 active:scale-95 transition-all">New {regMode} Record</button>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               {(regMode === 'staff' ? state.staff : regMode === 'subject' ? state.subjects : state.classes).map((item: any) => (
-                <div key={item.id} className="p-6 bg-white border border-slate-100 rounded-[2rem] flex justify-between items-center shadow-sm hover:shadow-md transition-all">
+                <div key={item.id} className="p-4 sm:p-6 bg-white border border-slate-100 rounded-2xl sm:rounded-[2rem] flex justify-between items-center shadow-sm hover:shadow-md transition-all">
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-black text-emerald-900">{item.name}</p>
+                      <p className="text-xs sm:text-sm font-black text-emerald-900">{item.name}</p>
                       {item.code && (
-                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-mono font-bold">
+                        <span className="px-1.5 sm:px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[8px] sm:text-[9px] font-mono font-bold">
                           {item.code}
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                       {item.department || (item.section ? `Section ${item.section}` : '')}
                     </p>
                   </div>
-                  <button onClick={() => deleteItem(regMode, item.id)} className="w-10 h-10 rounded-xl flex items-center justify-center text-red-200 hover:text-red-500 hover:bg-red-50 transition-all"><i className="fa-solid fa-trash-can"></i></button>
+                  <button onClick={() => deleteItem(regMode, item.id)} className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-red-300 hover:text-red-500 hover:bg-red-50 transition-all"><i className="fa-solid fa-trash-can text-xs sm:text-sm"></i></button>
                 </div>
               ))}
             </div>
@@ -486,28 +488,28 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
         {/* TIMETABLE */}
         {activeTab === 'time' && (
-          <div className="space-y-8 animate-in fade-in fill-mode-both">
-            <div className="flex flex-col md:flex-row gap-6 items-end">
+          <div className="space-y-6 sm:space-y-8 animate-in fade-in fill-mode-both">
+            <div className="flex flex-col md:flex-row gap-4 sm:gap-6 items-stretch md:items-end">
               <div className="flex-grow">
                 <Label>View Target Matrix</Label>
-                <select value={gridClassId} onChange={e => setGridClassId(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-bold text-emerald-900 focus:outline-emerald-500 shadow-inner">
+                <select value={gridClassId} onChange={e => setGridClassId(e.target.value)} className="w-full p-3.5 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-[10px] sm:text-[11px] font-bold text-emerald-900 focus:outline-emerald-500 shadow-inner">
                   <option value="">Choose Class Registry...</option>
                   {state.classes.map(c => <option key={c.id} value={c.id}>{c.name} - Sec {c.section}</option>)}
                 </select>
               </div>
-              <div className="flex bg-slate-100 p-2 rounded-2xl overflow-x-auto max-w-full">
+              <div className="flex bg-slate-100 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl overflow-x-auto max-w-full gap-1">
                 {state.config.workingDays.map(d => (
-                  <button key={d} onClick={() => setSelectedDay(d)} className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all whitespace-nowrap ${selectedDay === d ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-emerald-600'}`}>{d.substring(0,3)}</button>
+                  <button key={d} onClick={() => setSelectedDay(d)} className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[8px] sm:text-[9px] font-black uppercase transition-all whitespace-nowrap ${selectedDay === d ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-emerald-600'}`}>{d.substring(0,3)}</button>
                 ))}
               </div>
             </div>
             {gridClassId ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
                 {state.config.timeSlots.filter(s => selectedDay === 'Saturday' ? s.id.startsWith('sat-') : !s.id.startsWith('sat-')).map(slot => {
                   const slotEntries = state.timetable.filter(e => e.day === selectedDay && e.slotId === slot.id && e.classId === gridClassId);
-                  if (slot.isBreak) return <div key={slot.id} className="p-6 bg-amber-50 rounded-[2rem] border border-amber-100 flex items-center justify-center text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">{slot.label}</div>;
+                  if (slot.isBreak) return <div key={slot.id} className="p-4 sm:p-6 bg-amber-50 rounded-2xl sm:rounded-[2rem] border border-amber-100 flex items-center justify-center text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">{slot.label}</div>;
                   return (
-                    <div key={slot.id} onClick={() => setEditingSlot(slot.id)} className={`p-6 rounded-[2.5rem] border transition-all cursor-pointer relative group ${slotEntries.length > 0 ? 'bg-emerald-600 text-white shadow-xl' : 'bg-white border-slate-100 hover:border-emerald-200 shadow-sm'}`}>
+                    <div key={slot.id} onClick={() => setEditingSlot(slot.id)} className={`p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] border transition-all cursor-pointer relative group ${slotEntries.length > 0 ? 'bg-emerald-600 text-white shadow-xl' : 'bg-white border-slate-100 hover:border-emerald-200 shadow-sm'}`}>
                       <div className="flex justify-between items-center mb-2">
                         <p className="text-[8px] font-black uppercase opacity-60 tracking-widest">{slot.label}</p>
                         <span className="text-[9px] font-mono opacity-60">{formatSlotRange(slot.start, slot.end)}</span>
@@ -529,21 +531,21 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                         </div>
                       ) : <p className="text-[9px] font-black text-slate-300 py-4 text-center">Available Slot</p>}
                       {editingSlot === slot.id && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-emerald-950/50 backdrop-blur-md p-4" onClick={e => {e.stopPropagation(); setEditingSlot(null);}}>
-                          <div className="bg-white rounded-[3rem] p-10 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
-                            <h4 className="text-xl font-black text-emerald-900 mb-8 uppercase tracking-tighter">Allocate {slot.label}</h4>
-                            <div className="space-y-6 text-left">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-emerald-950/50 backdrop-blur-md p-3 sm:p-4" onClick={e => {e.stopPropagation(); setEditingSlot(null);}}>
+                          <div className="bg-white rounded-2xl sm:rounded-[3rem] p-5 sm:p-10 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                            <h4 className="text-base sm:text-xl font-black text-emerald-900 mb-4 sm:mb-8 uppercase tracking-tighter">Allocate {slot.label}</h4>
+                            <div className="space-y-4 sm:space-y-6 text-left">
                               <div><Label>Select Faculty</Label>
-                                <select id={`f-${slot.id}`} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900">
+                                <select id={`f-${slot.id}`} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900">
                                   {state.staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                               </div>
                               <div><Label>Select Subject</Label>
-                                <select id={`s-${slot.id}`} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900">
+                                <select id={`s-${slot.id}`} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900">
                                   {state.subjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                                 </select>
                               </div>
-                              <button onClick={() => handleAssignSlot(slot.id, (document.getElementById(`f-${slot.id}`) as any).value, (document.getElementById(`s-${slot.id}`) as any).value)} className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all">Assign To Grid</button>
+                              <button onClick={() => handleAssignSlot(slot.id, (document.getElementById(`f-${slot.id}`) as any).value, (document.getElementById(`s-${slot.id}`) as any).value)} className="w-full py-3 sm:py-4 bg-emerald-600 text-white rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all">Assign To Grid</button>
                             </div>
                           </div>
                         </div>
@@ -552,73 +554,62 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                   );
                 })}
               </div>
-            ) : <div className="flex-grow flex items-center justify-center border-4 border-dashed border-slate-50 rounded-[3rem] text-slate-200 font-black uppercase text-xs tracking-[0.3em] min-h-[400px]">Select Target to Display Matrix</div>}
+            ) : <div className="flex-grow flex items-center justify-center border-2 sm:border-4 border-dashed border-slate-100 rounded-2xl sm:rounded-[3rem] text-slate-300 font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.3em] min-h-[250px] sm:min-h-[400px] p-6 text-center">Select Target to Display Matrix</div>}
           </div>
         )}
 
-        {/* ATTENDANCE */}
+        {/* ATTENDANCE (STUDENT ATTENDANCE SUITE) */}
         {activeTab === 'attn' && (
-          <div className="space-y-10 animate-in fade-in fill-mode-both">
-            <h3 className="text-2xl font-black text-emerald-900 uppercase tracking-tighter">Presence Registry</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {state.staff.map(s => {
-                const today = new Date().toISOString().split('T')[0];
-                const marked = state.attendance.some(a => a.staffId === s.id && a.date === today);
-                return (
-                  <div key={s.id} className={`p-8 rounded-[2.5rem] border flex justify-between items-center transition-all ${marked ? 'bg-emerald-50 border-emerald-100 shadow-inner' : 'bg-white border-slate-100 shadow-sm hover:border-emerald-100'}`}>
-                    <div>
-                      <p className="text-sm font-black text-emerald-900">{s.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.department}</p>
-                    </div>
-                    <button onClick={() => markAttendance(s.id)} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${marked ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-100 text-slate-300 hover:bg-emerald-50 hover:text-emerald-600'}`}>
-                      <i className={`fa-solid ${marked ? 'fa-check-double' : 'fa-check'}`}></i>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="space-y-6 sm:space-y-8 animate-in fade-in fill-mode-both">
+            <AttendanceManager
+              appState={state}
+              onUpdateState={setState}
+              userRole={userRole}
+              triggerAlert={triggerAlert}
+              triggerConfirm={triggerConfirm}
+            />
           </div>
         )}
 
         {/* LEAVES */}
         {activeTab === 'leaves' && (
-          <div className="space-y-12 animate-in fade-in fill-mode-both">
-            <div className="bg-white p-10 rounded-[3rem] border border-emerald-100 shadow-sm">
-              <h4 className="text-sm font-black text-emerald-900 uppercase mb-8 tracking-widest">Absence Protocol</h4>
-              <form onSubmit={handleLeaveApply} className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-6">
+          <div className="space-y-6 sm:space-y-12 animate-in fade-in fill-mode-both">
+            <div className="bg-white p-5 sm:p-10 rounded-2xl sm:rounded-[3rem] border border-emerald-100 shadow-sm">
+              <h4 className="text-xs sm:text-sm font-black text-emerald-900 uppercase mb-4 sm:mb-8 tracking-widest">Absence Protocol</h4>
+              <form onSubmit={handleLeaveApply} className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-10">
+                <div className="space-y-4 sm:space-y-6">
                   <div><Label>Applicant</Label>
-                    <select value={leaveStaffId} onChange={e => setLeaveStaffId(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900 focus:outline-emerald-500">
+                    <select value={leaveStaffId} onChange={e => setLeaveStaffId(e.target.value)} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900 focus:outline-emerald-500">
                       <option value="">Select Faculty Identity...</option>
                       {state.staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Start Date</Label><input type="date" value={leaveStart} onChange={e => setLeaveStart(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-bold text-emerald-900" /></div>
-                    <div><Label>End Date</Label><input type="date" value={leaveEnd} onChange={e => setLeaveEnd(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-bold text-emerald-900" /></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div><Label>Start Date</Label><input type="date" value={leaveStart} onChange={e => setLeaveStart(e.target.value)} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-[11px] font-bold text-emerald-900" /></div>
+                    <div><Label>End Date</Label><input type="date" value={leaveEnd} onChange={e => setLeaveEnd(e.target.value)} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-[11px] font-bold text-emerald-900" /></div>
                   </div>
                 </div>
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div><Label>Justification</Label>
-                    <textarea value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="Provide context for this request..." className="w-full h-24 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold focus:outline-emerald-500 resize-none text-emerald-900 shadow-inner" />
+                    <textarea value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="Provide context for this request..." className="w-full h-24 p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold focus:outline-emerald-500 resize-none text-emerald-900 shadow-inner" />
                   </div>
-                  <button type="submit" className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all">Transmit Application</button>
+                  <button type="submit" className="w-full py-3.5 sm:py-4 bg-emerald-600 text-white rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all">Transmit Application</button>
                 </div>
               </form>
             </div>
             {userRole === 'principal' && (
-              <div className="space-y-6">
-                <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Auth Queue</h4>
+              <div className="space-y-4 sm:space-y-6">
+                <h4 className="text-xs sm:text-sm font-black text-emerald-900 uppercase tracking-widest">Auth Queue</h4>
                 {state.leaves.filter(l => l.status === 'Pending').map(req => (
-                  <div key={req.id} className="p-8 bg-white border border-slate-100 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
+                  <div key={req.id} className="p-4 sm:p-8 bg-white border border-slate-100 rounded-2xl sm:rounded-[2.5rem] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6 shadow-sm">
                     <div className="flex-grow">
-                      <p className="text-lg font-black text-emerald-900">{state.staff.find(s => s.id === req.staffId)?.name}</p>
+                      <p className="text-base sm:text-lg font-black text-emerald-900">{state.staff.find(s => s.id === req.staffId)?.name}</p>
                       <p className="text-xs font-bold text-slate-500 italic mb-2">"{req.reason}"</p>
                       <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{req.startDate} to {req.endDate}</p>
                     </div>
-                    <div className="flex gap-4">
-                      <button onClick={() => { setState(prev => ({ ...prev, leaves: prev.leaves.map(l => l.id === req.id ? {...l, status: 'Approved'} : l) })); addLog(`Approved leave: ${req.id}`); }} className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 active:scale-90 transition-transform">Accept</button>
-                      <button onClick={() => { setState(prev => ({ ...prev, leaves: prev.leaves.map(l => l.id === req.id ? {...l, status: 'Rejected'} : l) })); addLog(`Rejected leave: ${req.id}`); }} className="px-6 py-3 bg-white border border-red-100 text-red-500 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-red-50 transition-colors">Reject</button>
+                    <div className="flex gap-2 sm:gap-4 w-full md:w-auto">
+                      <button onClick={() => { setState(prev => ({ ...prev, leaves: prev.leaves.map(l => l.id === req.id ? {...l, status: 'Approved'} : l) })); addLog(`Approved leave: ${req.id}`); }} className="flex-1 md:flex-initial px-4 sm:px-6 py-2.5 sm:py-3 bg-emerald-600 text-white rounded-xl sm:rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 active:scale-90 transition-transform text-center">Accept</button>
+                      <button onClick={() => { setState(prev => ({ ...prev, leaves: prev.leaves.map(l => l.id === req.id ? {...l, status: 'Rejected'} : l) })); addLog(`Rejected leave: ${req.id}`); }} className="flex-1 md:flex-initial px-4 sm:px-6 py-2.5 sm:py-3 bg-white border border-red-100 text-red-500 rounded-xl sm:rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-red-50 transition-colors text-center">Reject</button>
                     </div>
                   </div>
                 ))}
@@ -629,42 +620,42 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
         {/* SECURITY (PRINCIPAL ONLY) */}
         {activeTab === 'sec' && userRole === 'principal' && (
-          <div className="space-y-12 animate-in fade-in fill-mode-both">
-            <h3 className="text-2xl font-black text-emerald-900 uppercase tracking-tighter">Access & Sync Center</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 p-10 bg-white border border-emerald-100 rounded-[3rem] shadow-sm">
-              <div className="space-y-6">
-                <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Principal Credentials</h4>
-                <div className="space-y-3"><Label>Username</Label><input type="text" value={state.settings.principalUsername} onChange={e => updateSettings('principalUsername', e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
-                <div className="space-y-3"><Label>Password</Label><input type="password" value={state.settings.principalPassword} onChange={e => updateSettings('principalPassword', e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
+          <div className="space-y-6 sm:space-y-12 animate-in fade-in fill-mode-both">
+            <h3 className="text-xl sm:text-2xl font-black text-emerald-900 uppercase tracking-tighter">Access & Sync Center</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-10 p-5 sm:p-10 bg-white border border-emerald-100 rounded-2xl sm:rounded-[3rem] shadow-sm">
+              <div className="space-y-4 sm:space-y-6">
+                <h4 className="text-xs sm:text-sm font-black text-emerald-900 uppercase tracking-widest">Principal Credentials (Dr. A. Suneetha)</h4>
+                <div className="space-y-2 sm:space-y-3"><Label>Username</Label><input type="text" value={state.settings.principalUsername} onChange={e => updateSettings('principalUsername', e.target.value)} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
+                <div className="space-y-2 sm:space-y-3"><Label>Password</Label><input type="password" value={state.settings.principalPassword} onChange={e => updateSettings('principalPassword', e.target.value)} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
               </div>
-              <div className="space-y-6">
-                <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Admin Credentials</h4>
-                <div className="space-y-3"><Label>Username</Label><input type="text" value={state.settings.adminUsername} onChange={e => updateSettings('adminUsername', e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
-                <div className="space-y-3"><Label>Password</Label><input type="password" value={state.settings.adminPassword} onChange={e => updateSettings('adminPassword', e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
+              <div className="space-y-4 sm:space-y-6">
+                <h4 className="text-xs sm:text-sm font-black text-emerald-900 uppercase tracking-widest">Admin Credentials</h4>
+                <div className="space-y-2 sm:space-y-3"><Label>Username</Label><input type="text" value={state.settings.adminUsername} onChange={e => updateSettings('adminUsername', e.target.value)} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
+                <div className="space-y-2 sm:space-y-3"><Label>Password</Label><input type="password" value={state.settings.adminPassword} onChange={e => updateSettings('adminPassword', e.target.value)} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
               </div>
             </div>
             
-            <div className="p-10 bg-white border border-emerald-100 rounded-[3rem] space-y-6 shadow-sm">
-              <div className="flex justify-between items-center"><h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Google SSO Entry</h4>
-                <button onClick={() => updateSettings('googleLoginEnabled', !state.settings.googleLoginEnabled)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${state.settings.googleLoginEnabled ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>{state.settings.googleLoginEnabled ? 'Active' : 'Disabled'}</button>
+            <div className="p-5 sm:p-10 bg-white border border-emerald-100 rounded-2xl sm:rounded-[3rem] space-y-4 sm:space-y-6 shadow-sm">
+              <div className="flex justify-between items-center"><h4 className="text-xs sm:text-sm font-black text-emerald-900 uppercase tracking-widest">Google SSO Entry</h4>
+                <button onClick={() => updateSettings('googleLoginEnabled', !state.settings.googleLoginEnabled)} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[8px] sm:text-[9px] font-black uppercase transition-all ${state.settings.googleLoginEnabled ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>{state.settings.googleLoginEnabled ? 'Active' : 'Disabled'}</button>
               </div>
               {state.settings.googleLoginEnabled && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-4">
-                  <div><Label>Google Client ID</Label><input type="text" value={state.settings.googleClientId} onChange={e => updateSettings('googleClientId', e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-mono text-emerald-800" /></div>
-                  <div><Label>Whitelisted Staff Emails</Label><input type="text" value={state.settings.approvedEmails.join(', ')} onChange={e => updateSettings('approvedEmails', e.target.value.split(',').map(s => s.trim()))} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-mono text-emerald-800" /></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 animate-in slide-in-from-top-4">
+                  <div><Label>Google Client ID</Label><input type="text" value={state.settings.googleClientId} onChange={e => updateSettings('googleClientId', e.target.value)} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-[10px] font-mono text-emerald-800" /></div>
+                  <div><Label>Whitelisted Staff Emails</Label><input type="text" value={state.settings.approvedEmails.join(', ')} onChange={e => updateSettings('approvedEmails', e.target.value.split(',').map(s => s.trim()))} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-[10px] font-mono text-emerald-800" /></div>
                 </div>
               )}
             </div>
 
-            <div className="p-10 bg-white border border-emerald-100 rounded-[3rem] space-y-6 shadow-sm">
-              <div className="flex items-center justify-between">
+            <div className="p-5 sm:p-10 bg-white border border-emerald-100 rounded-2xl sm:rounded-[3rem] space-y-4 sm:space-y-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Global Persistence Bridge</h4>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                  <h4 className="text-xs sm:text-sm font-black text-emerald-900 uppercase tracking-widest">Global Persistence Bridge</h4>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
                     Primary Cloud: <span className="text-emerald-700 font-mono font-semibold">Google Cloud Firestore (Active)</span>
                   </p>
                 </div>
-                <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+                <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-[9px] sm:text-[10px] font-black uppercase tracking-wider flex items-center gap-2 self-start sm:self-auto">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   Cloud Connected
                 </div>
@@ -677,15 +668,15 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                   placeholder="https://script.google.com/macros/s/.../exec (Optional)" 
                   value={state.settings.googleSheetWebAppUrl} 
                   onChange={e => updateSettings('googleSheetWebAppUrl', e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-mono text-emerald-800 shadow-inner" 
+                  className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-[10px] sm:text-[11px] font-mono text-emerald-800 shadow-inner" 
                 />
               </div>
 
-              <div className="flex gap-4 pt-2">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2">
                 <button 
                   onClick={handlePush} 
                   disabled={isSyncing} 
-                  className="flex-grow py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="flex-grow py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
                   <i className="fa-solid fa-cloud-arrow-up"></i>
                   {isSyncing ? 'Syncing...' : 'Push to Cloud Database'}
@@ -693,7 +684,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 <button 
                   onClick={handlePull} 
                   disabled={isSyncing} 
-                  className="flex-grow py-4 bg-white border border-emerald-100 hover:bg-emerald-50 text-emerald-700 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                  className="flex-grow py-3.5 sm:py-4 bg-white border border-emerald-100 hover:bg-emerald-50 text-emerald-700 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
                 >
                   <i className="fa-solid fa-cloud-arrow-down"></i>
                   {isSyncing ? 'Syncing...' : 'Pull Latest Cloud Data'}
@@ -705,42 +696,42 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
         {/* SYSTEM (PRINCIPAL ONLY) */}
         {activeTab === 'sys' && userRole === 'principal' && (
-          <div className="space-y-12 animate-in fade-in fill-mode-both">
-            <h3 className="text-2xl font-black text-emerald-900 uppercase tracking-tighter">Institutional Constants</h3>
+          <div className="space-y-6 sm:space-y-12 animate-in fade-in fill-mode-both">
+            <h3 className="text-xl sm:text-2xl font-black text-emerald-900 uppercase tracking-tighter">Institutional Constants</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 p-10 bg-white border border-emerald-100 rounded-[3rem] shadow-sm">
-              <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-10 p-5 sm:p-10 bg-white border border-emerald-100 rounded-2xl sm:rounded-[3rem] shadow-sm">
+              <div className="space-y-4 sm:space-y-6">
                 <Label>Operational Days Signature</Label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                    <button key={day} onClick={() => { const next = state.config.workingDays.includes(day) ? state.config.workingDays.filter(d => d !== day) : [...state.config.workingDays, day]; setState({...state, config: {...state.config, workingDays: next}}); }} className={`p-4 rounded-xl text-[9px] font-black uppercase transition-all border ${state.config.workingDays.includes(day) ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>{day}</button>
+                    <button key={day} onClick={() => { const next = state.config.workingDays.includes(day) ? state.config.workingDays.filter(d => d !== day) : [...state.config.workingDays, day]; setState({...state, config: {...state.config, workingDays: next}}); }} className={`p-3 sm:p-4 rounded-xl text-[8px] sm:text-[9px] font-black uppercase transition-all border ${state.config.workingDays.includes(day) ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>{day}</button>
                   ))}
                 </div>
               </div>
-              <div className="space-y-6">
-                <div><Label>Current Academic Year</Label><input type="text" value={state.config.academicYear} onChange={e => setState({...state, config: {...state.config, academicYear: e.target.value}})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
-                <div><Label>Active Enrollment Term</Label><input type="text" value={state.config.term} onChange={e => setState({...state, config: {...state.config, term: e.target.value}})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
+              <div className="space-y-4 sm:space-y-6">
+                <div><Label>Current Academic Year</Label><input type="text" value={state.config.academicYear} onChange={e => setState({...state, config: {...state.config, academicYear: e.target.value}})} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
+                <div><Label>Active Enrollment Term</Label><input type="text" value={state.config.term} onChange={e => setState({...state, config: {...state.config, term: e.target.value}})} className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-100 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-900 shadow-inner" /></div>
               </div>
             </div>
 
             {/* Configured Period Bell Timings */}
-            <div className="p-10 bg-white border border-emerald-100 rounded-[3rem] space-y-8 shadow-sm">
-              <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-6">
+            <div className="p-5 sm:p-10 bg-white border border-emerald-100 rounded-2xl sm:rounded-[3rem] space-y-6 sm:space-y-8 shadow-sm">
+              <div className="flex justify-between items-center flex-wrap gap-3 sm:gap-4 border-b border-slate-100 pb-4 sm:pb-6">
                 <div>
-                  <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Period Bell Schedules</h4>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mt-1">Configure default daily lecture durations and breaks</p>
+                  <h4 className="text-xs sm:text-sm font-black text-emerald-900 uppercase tracking-widest">Period Bell Schedules</h4>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mt-1">Configure default daily lecture durations and breaks</p>
                 </div>
                 <button 
                   onClick={addTimeSlot} 
-                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                  className="px-4 sm:px-5 py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl text-[8px] sm:text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
                 >
                   Add Custom Slot
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {state.config.timeSlots.map((slot) => (
-                  <div key={slot.id} className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 hover:shadow-md transition-all">
+                  <div key={slot.id} className="p-4 sm:p-6 bg-slate-50 rounded-2xl sm:rounded-[2rem] border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 hover:shadow-md transition-all">
                     {/* Period Label */}
                     <div className="w-full md:w-1/4">
                       <Label>Slot Label</Label>
@@ -748,7 +739,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                         type="text" 
                         value={slot.label} 
                         onChange={(e) => handleTimeSlotChange(slot.id, 'label', e.target.value)} 
-                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                        className="w-full p-2.5 sm:p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                       />
                     </div>
 
@@ -761,7 +752,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                         placeholder="e.g. 09:30 AM"
                         onChange={(e) => handleTimeSlotChange(slot.id, 'start', e.target.value)} 
                         onBlur={(e) => handleTimeSlotChange(slot.id, 'start', formatTo12Hour(e.target.value))}
-                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                        className="w-full p-2.5 sm:p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                       />
                     </div>
 
@@ -774,12 +765,12 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                         placeholder="e.g. 10:20 AM"
                         onChange={(e) => handleTimeSlotChange(slot.id, 'end', e.target.value)} 
                         onBlur={(e) => handleTimeSlotChange(slot.id, 'end', formatTo12Hour(e.target.value))}
-                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                        className="w-full p-2.5 sm:p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                       />
                     </div>
 
                     {/* Break Switch & Delete */}
-                    <div className="flex items-center gap-6 justify-between w-full md:w-auto">
+                    <div className="flex items-center gap-4 sm:gap-6 justify-between w-full md:w-auto">
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -794,10 +785,10 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                       <button 
                         onClick={() => deleteTimeSlot(slot.id)} 
                         disabled={state.config.timeSlots.length <= 1}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-red-300 hover:text-red-500 hover:bg-red-50 transition-all border border-transparent hover:border-red-100 disabled:opacity-40"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-red-300 hover:text-red-500 hover:bg-red-50 transition-all border border-transparent hover:border-red-100 disabled:opacity-40"
                         title="Delete slot"
                       >
-                        <i className="fa-solid fa-trash-can"></i>
+                        <i className="fa-solid fa-trash-can text-xs sm:text-sm"></i>
                       </button>
                     </div>
                   </div>
@@ -812,26 +803,26 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
       {/* 1. Time Slot Add Modal */}
       {isSlotModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white border border-emerald-100 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-emerald-950/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-emerald-100 rounded-2xl sm:rounded-[2.5rem] w-full max-w-md p-5 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 animate-in zoom-in-95 duration-200">
             <div>
-              <h3 className="text-xl font-black text-emerald-900 uppercase tracking-tighter">Add Custom Period Slot</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configure default daily lecture durations and breaks</p>
+              <h3 className="text-lg sm:text-xl font-black text-emerald-900 uppercase tracking-tighter">Add Custom Period Slot</h3>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configure default daily lecture durations and breaks</p>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
                 <Label>Slot Label</Label>
                 <input 
                   type="text" 
                   value={slotLabel} 
                   onChange={e => setSlotLabel(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                  className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   placeholder="e.g. Period 7 or Recess"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <Label>Start Time (12-hr)</Label>
                   <input 
@@ -839,7 +830,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     value={slotStart} 
                     onChange={e => setSlotStart(e.target.value)} 
                     placeholder="e.g. 04:00 PM"
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                    className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   />
                 </div>
                 <div>
@@ -849,33 +840,33 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     value={slotEnd} 
                     onChange={e => setSlotEnd(e.target.value)} 
                     placeholder="e.g. 04:50 PM"
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                    className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 pt-1 sm:pt-2">
                 <input
                   type="checkbox"
                   id="new-slot-break"
                   checked={slotIsBreak}
                   onChange={e => setSlotIsBreak(e.target.checked)}
-                  className="w-5 h-5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
                 />
-                <label htmlFor="new-slot-break" className="text-xs font-black text-emerald-800 uppercase tracking-wider cursor-pointer select-none">Is Break / Lunch</label>
+                <label htmlFor="new-slot-break" className="text-[11px] sm:text-xs font-black text-emerald-800 uppercase tracking-wider cursor-pointer select-none">Is Break / Lunch</label>
               </div>
             </div>
 
-            <div className="flex gap-4 pt-2">
+            <div className="flex gap-2 sm:gap-4 pt-2">
               <button 
                 onClick={handleConfirmAddSlot}
-                className="flex-grow py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95 animate-pulse"
+                className="flex-grow py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
               >
                 Add Period
               </button>
               <button 
                 onClick={() => setIsSlotModalOpen(false)}
-                className="py-4 px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
+                className="py-3.5 sm:py-4 px-4 sm:px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
               >
                 Cancel
               </button>
@@ -886,36 +877,36 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
       {/* 2. Staff Add Modal */}
       {isStaffModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white border border-emerald-100 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-emerald-950/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-emerald-100 rounded-2xl sm:rounded-[2.5rem] w-full max-w-md p-5 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 animate-in zoom-in-95 duration-200">
             <div>
-              <h3 className="text-xl font-black text-emerald-900 uppercase tracking-tighter">Add Staff Member</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Register new faculty scholar into central database</p>
+              <h3 className="text-lg sm:text-xl font-black text-emerald-900 uppercase tracking-tighter">Add Staff Member</h3>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Register new faculty scholar into central database</p>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
                 <Label>Staff Name</Label>
                 <input 
                   type="text" 
                   value={staffName} 
                   onChange={e => setStaffName(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                  className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   placeholder="e.g. Dr. Saravana Sai"
                 />
               </div>
             </div>
 
-            <div className="flex gap-4 pt-2">
+            <div className="flex gap-2 sm:gap-4 pt-2">
               <button 
                 onClick={handleConfirmAddStaff}
-                className="flex-grow py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                className="flex-grow py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
               >
                 Register Staff
               </button>
               <button 
                 onClick={() => setIsStaffModalOpen(false)}
-                className="py-4 px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
+                className="py-3.5 sm:py-4 px-4 sm:px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
               >
                 Cancel
               </button>
@@ -926,21 +917,21 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
       {/* 3. Subject Add Modal */}
       {isSubjectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white border border-emerald-100 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-emerald-950/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-emerald-100 rounded-2xl sm:rounded-[2.5rem] w-full max-w-md p-5 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 animate-in zoom-in-95 duration-200">
             <div>
-              <h3 className="text-xl font-black text-emerald-900 uppercase tracking-tighter">Register Subject</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Assign curriculum syllabus modules to schedule</p>
+              <h3 className="text-lg sm:text-xl font-black text-emerald-900 uppercase tracking-tighter">Register Subject</h3>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Assign curriculum syllabus modules to schedule</p>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
                 <Label>Subject Title</Label>
                 <input 
                   type="text" 
                   value={subjectName} 
                   onChange={e => setSubjectName(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                  className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   placeholder="e.g. Instrumental Analysis"
                 />
               </div>
@@ -950,22 +941,22 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                   type="text" 
                   value={subjectCode} 
                   onChange={e => setSubjectCode(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                  className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   placeholder="e.g. BP701T"
                 />
               </div>
             </div>
 
-            <div className="flex gap-4 pt-2">
+            <div className="flex gap-2 sm:gap-4 pt-2">
               <button 
                 onClick={handleConfirmAddSubject}
-                className="flex-grow py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                className="flex-grow py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
               >
                 Add Subject
               </button>
               <button 
                 onClick={() => setIsSubjectModalOpen(false)}
-                className="py-4 px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
+                className="py-3.5 sm:py-4 px-4 sm:px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
               >
                 Cancel
               </button>
@@ -976,21 +967,21 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
       {/* 4. Class Add Modal */}
       {isClassModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white border border-emerald-100 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-emerald-950/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-emerald-100 rounded-2xl sm:rounded-[2.5rem] w-full max-w-md p-5 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 animate-in zoom-in-95 duration-200">
             <div>
-              <h3 className="text-xl font-black text-emerald-900 uppercase tracking-tighter">Create Classroom</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configure academic batch enrollment targets</p>
+              <h3 className="text-lg sm:text-xl font-black text-emerald-900 uppercase tracking-tighter">Create Classroom</h3>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configure academic batch enrollment targets</p>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
                 <Label>Class / Year Description</Label>
                 <input 
                   type="text" 
                   value={classNameVal} 
                   onChange={e => setClassNameVal(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                  className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-xs font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   placeholder="e.g. B.Pharm Year 4"
                 />
               </div>
@@ -1000,22 +991,22 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                   type="text" 
                   value={classSection} 
                   onChange={e => setClassSection(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
+                  className="w-full p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-xs font-mono font-bold text-emerald-950 focus:outline-emerald-500 shadow-inner"
                   placeholder="e.g. B"
                 />
               </div>
             </div>
 
-            <div className="flex gap-4 pt-2">
+            <div className="flex gap-2 sm:gap-4 pt-2">
               <button 
                 onClick={handleConfirmAddClass}
-                className="flex-grow py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                className="flex-grow py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
               >
                 Add Class
               </button>
               <button 
                 onClick={() => setIsClassModalOpen(false)}
-                className="py-4 px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
+                className="py-3.5 sm:py-4 px-4 sm:px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
               >
                 Cancel
               </button>
@@ -1026,24 +1017,24 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
       {/* 5. Unified Alert & Confirmation Dialog */}
       {confirmConfig.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white border border-emerald-100 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-emerald-950/70 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-emerald-100 rounded-2xl sm:rounded-[2.5rem] w-full max-w-md p-5 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 animate-in zoom-in-95 duration-200">
             <div>
-              <h3 className="text-xl font-black text-emerald-900 uppercase tracking-tighter text-left">{confirmConfig.title}</h3>
-              <p className="text-xs text-slate-500 font-bold mt-3 leading-relaxed uppercase tracking-wider text-left">{confirmConfig.message}</p>
+              <h3 className="text-lg sm:text-xl font-black text-emerald-900 uppercase tracking-tighter text-left">{confirmConfig.title}</h3>
+              <p className="text-[11px] sm:text-xs text-slate-500 font-bold mt-2 sm:mt-3 leading-relaxed uppercase tracking-wider text-left">{confirmConfig.message}</p>
             </div>
 
-            <div className="flex gap-4 pt-2 w-full">
+            <div className="flex gap-2 sm:gap-4 pt-2 w-full">
               <button 
                 onClick={confirmConfig.onConfirm}
-                className="flex-grow py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                className="flex-grow py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
               >
                 {confirmConfig.confirmText || 'Confirm'}
               </button>
               {confirmConfig.cancelText && (
                 <button 
                   onClick={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
-                  className="py-4 px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
+                  className="py-3.5 sm:py-4 px-4 sm:px-6 bg-slate-50 border border-slate-100 text-slate-500 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
                 >
                   {confirmConfig.cancelText}
                 </button>

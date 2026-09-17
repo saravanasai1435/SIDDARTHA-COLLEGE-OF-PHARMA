@@ -13,6 +13,7 @@ export interface InstitutionConfig {
   timeSlots: TimeSlot[];
   academicYear: string;
   term: string;
+  attendanceCutoffPercent?: number; // e.g. 80 (default)
 }
 
 export interface TimetableEntry {
@@ -63,6 +64,45 @@ export interface Subject {
   code: string;
   name: string;
   department: string;
+  classId?: string;
+  assignedTeacherId?: string;
+}
+
+export interface Student {
+  id: string;
+  classId: string;
+  rollNumber: string;
+  name: string;
+  admissionNumber?: string;
+}
+
+export interface AttendanceSessionAudit {
+  action: 'created' | 'modified';
+  by: string;
+  at: string;
+  reason?: string;
+}
+
+export interface AttendanceSession {
+  id: string;
+  subjectId: string;
+  classId: string;
+  date: string; // YYYY-MM-DD
+  periodNumber: number;
+  slotId?: string;
+  markedBy: string;
+  markedAt: string;
+  notes?: string;
+  auditTrail?: AttendanceSessionAudit[];
+}
+
+export interface StudentAttendanceEntry {
+  id: string;
+  studentId: string;
+  sessionId: string;
+  status: 'present' | 'absent';
+  markedBy: string;
+  markedAt: string;
 }
 
 export interface ClassRoom {
@@ -120,6 +160,10 @@ export interface AppState {
   substitutions: Substitution[];
   settings: AdminSettings;
   logs: SystemLog[];
+  students?: Student[];
+  sessions?: AttendanceSession[];
+  studentAttendance?: StudentAttendanceEntry[];
+  rosterWipedV1?: boolean;
 }
 
 export interface AnalysisResult {

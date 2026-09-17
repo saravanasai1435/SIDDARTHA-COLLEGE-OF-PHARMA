@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [appState, setAppState] = useState(getState());
+  const [activePortalTab, setActivePortalTab] = useState<'class' | 'staff' | 'attendance'>('class');
   const [isInitialSync, setIsInitialSync] = useState(true);
   const [syncStatus, setSyncStatus] = useState('Synchronizing Core Database...');
   const [cloudStatus, setCloudStatus] = useState<'connected' | 'unreachable' | 'disabled'>('disabled');
@@ -67,6 +68,19 @@ const App: React.FC = () => {
                 start: formatTo12Hour(ts.start),
                 end: formatTo12Hour(ts.end)
               }));
+            }
+
+            // Student roster wipe safeguard
+            if (!cloudData.rosterWipedV1) {
+              cloudData.students = [];
+              cloudData.sessions = [];
+              cloudData.studentAttendance = [];
+              cloudData.rosterWipedV1 = true;
+              await saveStateToFirestore(cloudData).catch(console.warn);
+            } else {
+              if (cloudData.students === undefined) cloudData.students = [];
+              if (cloudData.sessions === undefined) cloudData.sessions = [];
+              if (cloudData.studentAttendance === undefined) cloudData.studentAttendance = [];
             }
 
             saveState(cloudData);
@@ -178,11 +192,11 @@ const App: React.FC = () => {
           )}
 
           {/* Hero / Banner */}
-          <section className="pt-12 pb-6">
-            <div className="max-w-7xl mx-auto px-4">
-              <div className="bg-gradient-to-br from-emerald-800 to-teal-900 rounded-[3rem] p-8 md:p-14 text-white shadow-2xl shadow-emerald-900/40 relative overflow-hidden group">
+          <section className="pt-6 sm:pt-12 pb-4 sm:pb-6">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4">
+              <div className="bg-gradient-to-br from-emerald-800 to-teal-900 rounded-3xl sm:rounded-[3rem] p-6 sm:p-10 md:p-14 text-white shadow-2xl shadow-emerald-900/30 relative overflow-hidden group">
                 
-                <div className="absolute top-0 right-0 w-full md:w-[60%] h-full opacity-40 md:opacity-60 overflow-hidden">
+                <div className="absolute top-0 right-0 w-full md:w-[60%] h-full opacity-30 md:opacity-60 overflow-hidden pointer-events-none">
                   <div className="w-full h-full relative">
                     <iframe 
                       className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-[100%] min-h-[100%] w-auto h-auto object-cover pointer-events-none scale-150"
@@ -192,33 +206,61 @@ const App: React.FC = () => {
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
                     ></iframe>
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-900 via-emerald-900/60 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-900 via-emerald-900/70 to-transparent"></div>
                 </div>
 
                 <div className="relative z-10 max-w-2xl text-left animate-in fade-in slide-in-from-left-8 duration-700">
-                  <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-white/10 rounded-full text-[10px] font-black tracking-widest uppercase mb-8 backdrop-blur-md border border-white/10">
+                  <div className="inline-flex items-center gap-2.5 px-3 sm:px-4 py-1.5 bg-white/10 rounded-full text-[9px] sm:text-[10px] font-black tracking-widest uppercase mb-5 sm:mb-8 backdrop-blur-md border border-white/10">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                     Digital Academic Hub
                   </div>
-                  <h1 className="text-4xl md:text-8xl font-black mb-6 leading-[1.1] tracking-tight text-white">
+                  <h1 className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-black mb-4 sm:mb-6 leading-[1.12] tracking-tight text-white">
                     Digital Pharmacy <br/>
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-200 to-teal-100">
                       Academic Gateway
                     </span>
                   </h1>
-                  <p className="text-emerald-100/80 text-sm md:text-lg mb-10 font-medium leading-relaxed max-w-lg">
+                  <p className="text-emerald-100/80 text-xs sm:text-base md:text-lg mb-6 sm:mb-10 font-medium leading-relaxed max-w-lg">
                     KVSR Siddhartha institutional portal. Automated timetable management and seamless faculty coordination for B.Pharm, Pharm.D, and M.Pharm.
                   </p>
                   
-                  <div className="flex flex-wrap gap-5">
-                    <button className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black shadow-xl shadow-emerald-900/20 transition-all hover:-translate-y-1 active:scale-95 text-[10px] uppercase tracking-widest">
-                      Live Schedule
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-2.5 sm:gap-4">
+                    <button 
+                      onClick={() => {
+                        setActivePortalTab('class');
+                        document.getElementById('institutional-portal-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className={`w-full sm:w-auto px-5 sm:px-7 py-3 sm:py-3.5 rounded-2xl font-black transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 ${
+                        activePortalTab === 'class'
+                          ? 'bg-emerald-400 text-emerald-950 shadow-xl shadow-emerald-950/20 sm:scale-105'
+                          : 'bg-emerald-500/80 hover:bg-emerald-400 text-white'
+                      }`}
+                    >
+                      <i className="fa-solid fa-calendar-days"></i>
+                      Class Schedules
                     </button>
+
+                    <button 
+                      onClick={() => {
+                        setActivePortalTab('attendance');
+                        document.getElementById('institutional-portal-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className={`w-full sm:w-auto px-5 sm:px-7 py-3 sm:py-3.5 rounded-2xl font-black transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 ${
+                        activePortalTab === 'attendance'
+                          ? 'bg-white text-emerald-950 shadow-xl shadow-emerald-950/20 sm:scale-105'
+                          : 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border border-white/20'
+                      }`}
+                    >
+                      <i className="fa-solid fa-clipboard-user text-emerald-300"></i>
+                      Class Attendance Ledger
+                    </button>
+
                     <button 
                       onClick={toggleAdminMode}
-                      className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black border border-white/20 backdrop-blur-md transition-all text-[10px] uppercase tracking-widest"
+                      className="w-full sm:w-auto px-5 sm:px-7 py-3 sm:py-3.5 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black border border-white/20 backdrop-blur-md transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
                     >
-                      Admin Access
+                      <i className="fa-solid fa-shield-halved"></i>
+                      Faculty & Admin Portal
                     </button>
                   </div>
                 </div>
@@ -226,23 +268,23 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          <section className="animate-in fade-in duration-1000 delay-300">
-            <TimetableBoard />
+          <section id="institutional-portal-section" className="animate-in fade-in duration-1000 delay-300">
+            <TimetableBoard key={activePortalTab} initialViewMode={activePortalTab} />
           </section>
 
-          <section className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 mb-24">
+          <section className="max-w-7xl mx-auto px-3 sm:px-4 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-16 sm:mb-24">
             {[
               { icon: 'fa-vial-circle-check', label: 'B.Pharm Intake', value: '100+', color: 'text-blue-600', bg: 'bg-blue-50' },
               { icon: 'fa-user-doctor', label: 'Pharm.D Scholars', value: '30+', color: 'text-emerald-600', bg: 'bg-emerald-50' },
               { icon: 'fa-award', label: 'NAAC Rating', value: 'A Grade', color: 'text-purple-600', bg: 'bg-purple-50' },
               { icon: 'fa-hand-holding-medical', label: 'Hospital Ties', value: '5+', color: 'text-amber-600', bg: 'bg-amber-50' },
             ].map((stat, i) => (
-              <div key={i} className={`glass p-8 rounded-[2rem] text-center border-white shadow-xl shadow-emerald-900/5 transition-all hover:scale-105`}>
-                <div className={`w-14 h-14 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mx-auto mb-5 text-xl shadow-inner`}>
+              <div key={i} className={`glass p-4 sm:p-8 rounded-2xl sm:rounded-[2rem] text-center border-white shadow-xl shadow-emerald-900/5 transition-all hover:scale-102`}>
+                <div className={`w-11 h-11 sm:w-14 sm:h-14 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-5 text-base sm:text-xl shadow-inner`}>
                    <i className={`fa-solid ${stat.icon}`}></i>
                 </div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                <p className="text-2xl font-black text-emerald-900">{stat.value}</p>
+                <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                <p className="text-lg sm:text-2xl font-black text-emerald-900">{stat.value}</p>
               </div>
             ))}
           </section>

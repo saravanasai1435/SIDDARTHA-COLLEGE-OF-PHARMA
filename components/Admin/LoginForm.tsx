@@ -38,7 +38,7 @@ const LoginForm: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
         setError(`Access Denied: ${userEmail} is not whitelisted.`);
       }
     } catch (err) {
-      setError('Single Sign-On failed. Please contact Principal.');
+      setError('Single Sign-On failed. Please contact Principal Dr. A. Suneetha.');
     }
   };
 

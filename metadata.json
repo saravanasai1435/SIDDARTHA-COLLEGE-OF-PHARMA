@@ -3,7 +3,7 @@
     "geolocation"
   ],
   "name": "KVSR SCOPS Enterprise Portal",
-  "description": "KVSR Siddhartha College of Pharmaceutical Sciences Academic Timetable Portal",
+  "description": "KVSR Siddhartha College of Pharmaceutical Sciences Academic Timetable & Attendance Portal",
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

@@ -1,11 +1,12 @@
 
 import { AppState, AdminSettings } from '../types';
 import { saveStateToFirestore } from './firebaseService';
-import { getFreshInitialState, FRESH_INSTITUTION_CONFIG } from './freshTimetableData';
+import { getFreshInitialState, FRESH_INSTITUTION_CONFIG, FRESH_CLASSES, FRESH_SUBJECTS, FRESH_TIMETABLE, FRESH_STAFF } from './freshTimetableData';
+import { generateDefaultStudents, generateSampleSessionsAndAttendance } from './attendanceService';
 import { formatTo12Hour } from './timeUtils';
 
 const KEYS = {
-  STATE: 'kvsc_enterprise_state_2026_institutional_v2',
+  STATE: 'kvsc_enterprise_state_2026_institutional_v3_nostudents',
   AUTH: 'sc_auth_session',
   ROLE: 'sc_auth_role'
 };
@@ -64,13 +65,32 @@ export const getState = (): AppState => {
     }
     if (!parsed.config) {
       parsed.config = FRESH_INSTITUTION_CONFIG;
-    } else if (parsed.config.timeSlots) {
-      parsed.config.timeSlots = parsed.config.timeSlots.map((ts: any) => ({
-        ...ts,
-        start: formatTo12Hour(ts.start),
-        end: formatTo12Hour(ts.end)
-      }));
+    } else {
+      if (parsed.config.attendanceCutoffPercent === undefined) {
+        parsed.config.attendanceCutoffPercent = 80;
+      }
+      if (parsed.config.timeSlots) {
+        parsed.config.timeSlots = parsed.config.timeSlots.map((ts: any) => ({
+          ...ts,
+          start: formatTo12Hour(ts.start),
+          end: formatTo12Hour(ts.end)
+        }));
+      }
     }
+
+    // Ensure roster is wiped of default students and directory starts empty
+    if (!parsed.rosterWipedV1) {
+      parsed.students = [];
+      parsed.sessions = [];
+      parsed.studentAttendance = [];
+      parsed.rosterWipedV1 = true;
+      localStorage.setItem(KEYS.STATE, JSON.stringify(parsed));
+    } else {
+      if (!parsed.students) parsed.students = [];
+      if (!parsed.sessions) parsed.sessions = [];
+      if (!parsed.studentAttendance) parsed.studentAttendance = [];
+    }
+
     return parsed;
   } catch (e) {
     return resetToFreshPhotoData();
